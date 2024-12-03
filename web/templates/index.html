@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSheetsDB Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">GSheetsDB Dashboard</h1>
+        
+        <!-- Connection Status -->
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-4">Connection Status</h2>
+            <div class="flex items-center">
+                <div class="w-4 h-4 rounded-full mr-2 {% if is_connected %}bg-green-500{% else %}bg-red-500{% endif %}"></div>
+                <span>{% if is_connected %}Connected{% else %}Not Connected{% endif %}</span>
+            </div>
+        </div>
+
+        <!-- Connect Form -->
+        <div class="mb-8 p-6 bg-white rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Connect to Google Sheets</h2>
+            <form id="connect-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Credentials Path</label>
+                    <input type="text" name="credentials_path" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Connect
+                </button>
+            </form>
+        </div>
+
+        <!-- Create Sheet Form -->
+        <div class="mb-8 p-6 bg-white rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Create New Sheet</h2>
+            <form id="create-sheet-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Sheet Title</label>
+                    <input type="text" name="title" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Schema Definition</label>
+                    <textarea name="schema" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                </div>
+                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    Create Sheet
+                </button>
+            </form>
+        </div>
+
+        <!-- Insert Data Form -->
+        <div class="p-6 bg-white rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Insert Data</h2>
+            <form id="insert-data-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Data (JSON)</label>
+                    <textarea name="data" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                </div>
+                <button type="submit" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                    Insert Data
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Add JavaScript for form handling
+        document.getElementById('connect-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            try {
+                const response = await fetch('/connect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        credentials_path: formData.get('credentials_path')
+                    })
+                });
+                const data = await response.json();
+                alert(data.message);
+                if (data.status === 'success') {
+                    location.reload();
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        // Add similar event listeners for other forms
+    </script>
+</body>
+</html> 
