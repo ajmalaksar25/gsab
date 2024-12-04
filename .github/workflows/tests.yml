@@ -32,12 +32,19 @@ jobs:
       run: |
         mkdir -p tests
         echo '${{ secrets.GOOGLE_CREDENTIALS }}' > tests/credentials.json
-        echo 'GOOGLE_CREDENTIALS_PATH=tests/credentials.json' > tests/.env
-        echo 'ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}' >> tests/.env
+        echo "GOOGLE_CREDENTIALS_PATH=tests/credentials.json" > tests/.env
+        echo "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" >> tests/.env
+        # Verify the file exists and has content
+        ls -l tests/credentials.json
+        test -s tests/credentials.json || (echo "Credentials file is empty" && exit 1)
     
     - name: Run tests
+      env:
+        GOOGLE_CREDENTIALS_PATH: tests/credentials.json
+        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        PYTHONPATH: ${{ github.workspace }}
       run: |
-        python -m pytest tests/ --cov=gsheets_db --cov-report=xml
+        python -m pytest tests/ --cov=gsheets_db --cov-report=xml -v
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v2
