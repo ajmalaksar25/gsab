@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="gsheets_db",
     version="0.1.0",
-    packages=find_packages(),
+    packages=find_packages(include=['gsheets_db', 'gsheets_db.*']),
     install_requires=[
         "google-auth-oauthlib>=0.4.6",
         "google-auth-httplib2>=0.1.0",

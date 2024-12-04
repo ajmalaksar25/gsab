@@ -26,16 +26,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest pytest-asyncio pytest-cov
+        pip install -e .
     
     - name: Create service account credentials
       run: |
+        mkdir -p tests
         echo '${{ secrets.GOOGLE_CREDENTIALS }}' > tests/credentials.json
         echo 'GOOGLE_CREDENTIALS_PATH=tests/credentials.json' > tests/.env
         echo 'ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}' >> tests/.env
     
     - name: Run tests
       run: |
-        pytest tests/ --cov=gsheets_db --cov-report=xml
+        python -m pytest tests/ --cov=gsheets_db --cov-report=xml
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v2
