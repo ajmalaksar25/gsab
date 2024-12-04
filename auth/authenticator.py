@@ -9,7 +9,8 @@ class GoogleAuthenticator:
     
     SCOPES = [
         'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive.file'
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive'
     ]
     
     def __init__(self, credentials_path: str, token_path: str = 'token.pickle'):

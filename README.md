@@ -68,8 +68,8 @@ sheet = await sheet_manager.create_sheet("Users Data")
 
 ```python
 await manager.insert({
-"id": 1,
-"email": "user@example.com",
+    "id": 1,
+    "email": "user@example.com",
     "password": "secretpass123"
 })
 ```
