@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="gsheets-db",
+    name="gsheets_db",
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
         "google-auth-oauthlib>=0.4.6",
-        "google-auth>=2.3.3",
+        "google-auth-httplib2>=0.1.0",
         "google-api-python-client>=2.0.0",
         "fastapi>=0.68.0",
         "uvicorn>=0.15.0",
@@ -15,13 +15,14 @@ setup(
         "aiofiles>=0.8.0",
         "cryptography>=3.4.7",
         "python-dotenv>=0.19.0",
+        "cryptography>=3.4.7",
     ],
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="Ajmal Aksar",
+    author_email="ajmalaksar25@gmail.com",
     description="A Python library for using Google Sheets as a database backend",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/gsheets-db",
+    url="https://github.com/ajmalaksar/gsheets_db",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
@@ -30,5 +31,5 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
 ) 
