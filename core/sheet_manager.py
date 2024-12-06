@@ -63,12 +63,15 @@ class SheetManager:
             raise
             
     async def insert(self, data: Dict[str, Any]) -> None:
-        """
-        Insert a new row of data.
+        """Insert a record into the sheet."""
+        if not self.sheet_id:
+            raise Exception("Sheet not created")
         
-        Args:
-            data: Dictionary mapping field names to values
-        """
+        # Validate data
+        errors = self.schema.validate(data)
+        if errors:
+            raise ValueError(f"Validation errors: {', '.join(errors)}")
+        
         try:
             validated_data = self._validate_data(data)
             values = []
@@ -101,6 +104,9 @@ class SheetManager:
             
             logger.info(f"Inserted new row: {data}")
             
+        except ValueError as e:
+            logger.error(f"Validation error: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Failed to insert data: {str(e)}")
             raise

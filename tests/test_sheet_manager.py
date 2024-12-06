@@ -85,3 +85,87 @@ async def test_advanced_operations(sheet_manager):
     assert len(page_1) == 2
     assert len(page_2) == 2
     assert page_1[0]["id"] != page_2[0]["id"] 
+
+@pytest.mark.asyncio
+async def test_sheet_manager_error_handling(sheet_manager):
+    """Test error handling in sheet manager."""
+    # Test invalid sheet operations
+    with pytest.raises(Exception):
+        await sheet_manager.read()  # Reading before creating sheet
+    
+    with pytest.raises(Exception):
+        await sheet_manager.update({"id": 1}, {"name": "Updated"})
+    
+    with pytest.raises(Exception):
+        await sheet_manager.delete({"id": 1})
+
+@pytest.mark.asyncio
+async def test_sheet_manager_complex_operations(sheet_manager):
+    """Test complex sheet operations."""
+    await sheet_manager.create_sheet("Complex Test")
+    
+    # Test batch operations
+    test_data = [
+        {"id": i, "name": f"User {i}", "age": 20 + i}
+        for i in range(1, 4)
+    ]
+    
+    # Test batch insert
+    for record in test_data:
+        await sheet_manager.insert(record)
+    
+    # Test complex filters
+    results = await sheet_manager.read({
+        "age": {"$gt": 21},
+        "name": {"$regex": "User"}
+    })
+    assert len(results) > 0
+    
+    # Test update with complex filter
+    await sheet_manager.update(
+        {"age": {"$gt": 21}},
+        {"name": "Updated User"}
+    )
+    
+    # Test delete with filter
+    await sheet_manager.delete({"age": {"$gt": 22}})
+    
+    # Verify results
+    remaining = await sheet_manager.read()
+    assert len(remaining) < len(test_data)
+
+@pytest.mark.asyncio
+async def test_sheet_manager_validation(sheet_manager):
+    """Test schema validation in sheet manager."""
+    await sheet_manager.create_sheet("Validation Test")
+    
+    # Test invalid data type for required field
+    with pytest.raises(Exception):  # Sheet manager wraps validation errors
+        await sheet_manager.insert({
+            "id": "not_an_integer",  # Invalid type for required integer field
+            "name": "Test User",
+            "email": "test@example.com",
+            "age": 30,
+            "salary": 50000.00,
+            "is_active": True,
+            "notes": "Test notes"
+        })
+    
+    # Test missing required fields
+    with pytest.raises(Exception):  # Sheet manager wraps validation errors
+        await sheet_manager.insert({
+            "id": 1,
+            "name": "Test User"  # Missing other required fields
+        })
+    
+    # Test invalid field value
+    with pytest.raises(Exception):  # Sheet manager wraps validation errors
+        await sheet_manager.insert({
+            "id": 1,
+            "name": "Test User",
+            "email": "test@example.com",
+            "age": -1,  # Invalid age (must be positive)
+            "salary": 50000.00,
+            "is_active": True,
+            "notes": "Test notes"
+        })

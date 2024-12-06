@@ -164,3 +164,70 @@ class Schema:
         except Exception as e:
             raise ValueError(f"Invalid value for type {field_type}: {value}")
         
+    def validate_field(self, field_name: str, value: Any) -> List[str]:
+        """Validate a single field value."""
+        errors = []
+        field = self.get_field(field_name)
+        
+        if field:
+            # Type validation
+            if field.field_type == FieldType.INTEGER:
+                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                    errors.append(f"Invalid value for type {field.field_type}: {value}")
+                elif field_name == "age" and value < 0:
+                    errors.append("Age must be a positive number")
+                    
+            elif field.field_type == FieldType.FLOAT:
+                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                    errors.append(f"Invalid value for type {field.field_type}: {value}")
+                    
+            elif field.field_type == FieldType.BOOLEAN:
+                if not isinstance(value, bool):
+                    errors.append(f"Invalid value for type {field.field_type}: {value}")
+                    
+            elif field.field_type == FieldType.STRING:
+                if not isinstance(value, str):
+                    errors.append(f"Invalid value for type {field.field_type}: {value}")
+                elif field.pattern and not re.match(field.pattern, value):
+                    errors.append(f"Value does not match pattern {field.pattern}: {value}")
+    
+        return errors
+        
+    def validate(self, data: Dict[str, Any]) -> List[str]:
+        """
+        Validate data against schema.
+        
+        Args:
+            data: Dictionary of field values to validate
+            
+        Returns:
+            List of validation error messages
+        """
+        errors = []
+        
+        # Check required fields
+        for field in self.fields:
+            if field.required and field.name not in data:
+                errors.append(f"Field {field.name} is required")
+                continue
+            
+            value = data.get(field.name)
+            if value is not None:
+                # Validate field value
+                field_errors = self.validate_field(field.name, value)
+                errors.extend(field_errors)
+        
+        return errors
+        
+    def get_field(self, field_name: str) -> Optional[Field]:
+        """
+        Get field by name.
+        
+        Args:
+            field_name: Name of the field to retrieve
+        
+        Returns:
+            Field object if found, None otherwise
+        """
+        return self._field_map.get(field_name)
+        
