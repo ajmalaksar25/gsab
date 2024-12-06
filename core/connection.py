@@ -16,7 +16,11 @@ class SheetConnection:
     async def connect(self) -> None:
         """Establish connection to Google Sheets API."""
         try:
-            SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+            SCOPES = [
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive',
+                'https://www.googleapis.com/auth/drive.file'
+            ]
             
             # Use service account credentials
             self.credentials = service_account.Credentials.from_service_account_file(

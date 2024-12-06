@@ -15,10 +15,15 @@ class SheetManager:
     """Manages CRUD operations for Google Sheets."""
     
     def __init__(self, connection: SheetConnection, schema: Schema, encryption_key: Optional[str] = None):
+        """Initialize sheet manager."""
         self.connection = connection
         self.schema = schema
         self.sheet_id = None
-        self.encryptor = Encryptor(encryption_key) if encryption_key else None
+        self._field_map = {field.name: field for field in self.schema.fields}
+        
+        # Initialize encryptor only if we have encrypted fields
+        has_encrypted_fields = any(field.encrypted for field in self.schema.fields)
+        self.encryptor = Encryptor(encryption_key) if has_encrypted_fields and encryption_key else None
         
     async def create_sheet(self, title: str) -> str:
         """
@@ -66,7 +71,22 @@ class SheetManager:
         """
         try:
             validated_data = self._validate_data(data)
-            values = self._prepare_row_data(validated_data)
+            values = []
+            
+            # Prepare row data with encryption
+            for field in self.schema.fields:
+                value = validated_data.get(field.name, '')
+                
+                # Handle encryption for fields marked as encrypted
+                if field.encrypted and self.encryptor and value:
+                    try:
+                        value = self.encryptor.encrypt(value)
+                        logger.info(f"Encrypted field {field.name}")
+                    except Exception as e:
+                        logger.error(f"Failed to encrypt field {field.name}: {str(e)}")
+                        raise
+                
+                values.append(str(value))
             
             body = {
                 'values': [values]
@@ -181,93 +201,136 @@ class SheetManager:
         return row_data
 
     async def read(self, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """
-        Read data from sheet, optionally filtered.
-        
-        Args:
-            filters: Dictionary of field-value pairs to filter by
-        
-        Returns:
-            List of row data as dictionaries
-        """
+        """Read records matching the filters."""
         try:
-            range_name = f"{self.schema.name}!A1:Z"
+            # Get all data
             result = self.connection.service.spreadsheets().values().get(
                 spreadsheetId=self.sheet_id,
-                range=range_name
+                range=f"{self.schema.name}!A:Z"
             ).execute()
-            
-            rows = result.get('values', [])
-            if not rows:
+
+            if 'values' not in result:
                 return []
+
+            values = result['values']
+            if len(values) <= 1:  # Only header row
+                return []
+
+            # Get header row
+            headers = values[0]
             
-            # First row is headers
-            headers = rows[0]
-            data = []
-            
-            for row in rows[1:]:
-                # Pad row with empty strings if needed
-                row_data = row + [''] * (len(headers) - len(row))
-                row_dict = dict(zip(headers, row_data))
+            # Process data rows
+            records = []
+            for row_index, row in enumerate(values[1:], start=1):
+                record = {}
                 
-                # Apply filters if any
-                if filters:
-                    if all(row_dict.get(k) == str(v) for k, v in filters.items()):
-                        data.append(row_dict)
-                else:
-                    data.append(row_dict)
+                # Pad row with empty strings if necessary
+                row_data = row + [''] * (len(headers) - len(row))
+                
+                for header, value in zip(headers, row_data):
+                    field = self._field_map.get(header)
+                    if field:
+                        # Handle encrypted fields
+                        if field.encrypted and self.encryptor and value:
+                            try:
+                                value = self.encryptor.decrypt(value)
+                            except Exception as e:
+                                logger.warning(f"Failed to decrypt field {header}: {str(e)}")
+                                
+                        # Convert value to appropriate type
+                        try:
+                            record[header] = self.schema._convert_value(value, field.field_type)
+                        except ValueError:
+                            # If conversion fails, store as string
+                            record[header] = str(value)
+                
+                # Store row index for update operations
+                record['_row_index'] = row_index
+                
+                # Apply filters
+                if filters and not self._matches_filters(record, filters):
+                    continue
                     
-            return data
-            
+                records.append(record)
+
+            return records
+
         except Exception as e:
             logger.error(f"Failed to read data: {str(e)}")
             raise
 
+    def _matches_filters(self, record: Dict[str, Any], filters: Dict[str, Any]) -> bool:
+        """Check if record matches all filters."""
+        for field, filter_value in filters.items():
+            if field not in record:
+                return False
+                
+            if isinstance(filter_value, dict):
+                # Handle operators like $regex
+                for op, value in filter_value.items():
+                    if op == '$regex':
+                        import re
+                        if not re.search(value, str(record[field])):
+                            return False
+            else:
+                # Direct value comparison
+                if record[field] != filter_value:
+                    return False
+                    
+        return True
+
     async def update(self, filters: Dict[str, Any], updates: Dict[str, Any]) -> int:
-        """
-        Update rows matching filters with new values.
-        
-        Args:
-            filters: Dictionary of field-value pairs to filter by
-            updates: Dictionary of field-value pairs to update
-        
-        Returns:
-            Number of rows updated
-        """
+        """Update records matching the filters."""
         try:
-            # Read existing data
-            rows = await self.read(filters)
-            if not rows:
+            # First get all matching records
+            matching_records = await self.read(filters)
+            if not matching_records:
+                logger.info("No rows found matching the filters")
                 return 0
-            
-            # Get all data to find row indices
-            all_rows = await self.read()
-            updated_count = 0
-            
-            for row in rows:
-                row_index = all_rows.index(row) + 2  # +2 for 1-based index and header row
+
+            # Get the sheet ID and range
+            sheet_metadata = self.connection.service.spreadsheets().get(
+                spreadsheetId=self.sheet_id
+            ).execute()
+            sheet_id = sheet_metadata['sheets'][0]['properties']['sheetId']
+
+            # Prepare batch update request
+            requests = []
+            for record in matching_records:
+                row_index = record.get('_row_index', 0)  # We need to store row index during read
                 
-                # Prepare update data
-                validated_updates = self._validate_data({**row, **updates})
-                update_values = self._prepare_row_data(validated_updates)
-                
-                # Update row
-                range_name = f"{self.schema.name}!A{row_index}"
-                body = {
-                    'values': [update_values]
-                }
-                
-                self.connection.service.spreadsheets().values().update(
+                values = []
+                for field in self.schema.fields:
+                    if field.name in updates:
+                        value = updates[field.name]
+                        if field.encrypted and self.encryptor:
+                            value = self.encryptor.encrypt(value)
+                        values.append(value)
+                    else:
+                        values.append(record[field.name])
+
+                requests.append({
+                    'updateCells': {
+                        'range': {
+                            'sheetId': sheet_id,
+                            'startRowIndex': row_index,
+                            'endRowIndex': row_index + 1,
+                            'startColumnIndex': 0,
+                            'endColumnIndex': len(self.schema.fields)
+                        },
+                        'rows': [{'values': [{'userEnteredValue': {'stringValue': str(v)}} for v in values]}],
+                        'fields': 'userEnteredValue'
+                    }
+                })
+
+            if requests:
+                self.connection.service.spreadsheets().batchUpdate(
                     spreadsheetId=self.sheet_id,
-                    range=range_name,
-                    valueInputOption='RAW',
-                    body=body
+                    body={'requests': requests}
                 ).execute()
-                
-                updated_count += 1
-                
-            return updated_count
-            
+
+            return len(matching_records)
+
         except Exception as e:
             logger.error(f"Failed to update data: {str(e)}")
             raise

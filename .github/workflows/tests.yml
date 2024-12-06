@@ -32,11 +32,17 @@ jobs:
       run: |
         mkdir -p tests
         echo '${{ secrets.GOOGLE_CREDENTIALS }}' > tests/credentials.json
-        echo "GOOGLE_CREDENTIALS_PATH=tests/credentials.json" > tests/.env
-        echo "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" >> tests/.env
-        # Verify the file exists and has content
-        ls -l tests/credentials.json
+        # Generate encryption key if not provided
+        if [ -z "${{ secrets.ENCRYPTION_KEY }}" ]; then
+          python -c "from cryptography.fernet import Fernet; print(f'ENCRYPTION_KEY={Fernet.generate_key().decode()}')" > tests/.env
+        else
+          echo "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" > tests/.env
+        fi
+        echo "GOOGLE_CREDENTIALS_PATH=tests/credentials.json" >> tests/.env
+        # Verify files exist and have content
+        ls -l tests/credentials.json tests/.env
         test -s tests/credentials.json || (echo "Credentials file is empty" && exit 1)
+        test -s tests/.env || (echo "Env file is empty" && exit 1)
     
     - name: Run tests
       env:
