@@ -44,3 +44,8 @@ ENV/
 
 # Project specific
 tests/credentials.json 
+
+# PyPI
+dist/
+build/
+*.egg-info/ 

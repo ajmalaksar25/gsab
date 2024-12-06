@@ -1,16 +1,14 @@
 # GSheetsDB
 
-A Python library that enables using Google Sheets as a database backend with features like schema validation, encryption, and a web dashboard.
+A Python library that enables using Google Sheets as a database backend with features like schema validation and encryption.
 
 ## Features
 
 - 🔒 Secure Google Sheets integration with OAuth2
 - 📊 Schema validation and type checking
 - 🔐 Field-level encryption for sensitive data
-- 🌐 Web dashboard for easy management
-- 🚀 Async/await support
+- 🌐 Async/await support
 - 📝 Comprehensive logging
-- ⚡ Rate limiting and quota management
 
 ## Installation
 
@@ -27,100 +25,56 @@ pip install gsheets-db
    - Create OAuth 2.0 credentials
    - Download credentials JSON file
 
-2. Basic Usage:
+2. Set up environment variables:
 
-```python
-from gsheets_db.core.connection import SheetConnection
-from gsheets_db.core.schema import Schema, Field, FieldType
-from gsheets_db.core.sheet import SheetManager
+```bash
+GOOGLE_CREDENTIALS_PATH=/path/to/credentials.json
+ENCRYPTION_KEY=your-encryption-key
 ```
 
-### Define your schema
+3. Basic Usage:
 
 ```python
+from gsheets_db import SheetConnection, Schema, Field, FieldType, SheetManager
+
+# Define your schema
 schema = Schema("users", [
     Field("id", FieldType.INTEGER, required=True, unique=True),
     Field("email", FieldType.STRING, required=True),
     Field("password", FieldType.STRING, required=True, encrypted=True)
 ])
+
+# Connect and use
+async def main():
+    connection = SheetConnection()
+    await connection.connect()
+    
+    sheet_manager = SheetManager(connection, schema)
+    
+    # Create a new sheet
+    sheet = await sheet_manager.create_sheet("Users Data")
+    
+    # Insert data
+    await sheet_manager.insert({
+        "id": 1,
+        "email": "user@example.com",
+        "password": "secretpass123"  # Will be automatically encrypted
+    })
+
 ```
-
-### Connect to your Google Sheet
-
-```python
-connection = SheetConnection("path/to/credentials.json")
-await connection.connect()
-```
-
-### Create a new sheet manager
-
-```python
-sheet_manager = SheetManager(connection, schema, encryption_key="your-encryption-key")
-```
-
-### Create a new sheet
-
-```python
-sheet = await sheet_manager.create_sheet("Users Data")
-```
-
-### Insert data
-
-```python
-await manager.insert({
-    "id": 1,
-    "email": "user@example.com",
-    "password": "secretpass123"
-})
-```
-
-
-## Web Dashboard
-
-The library includes a web dashboard for easy management:
-
-```bash
-# Install web dependencies
-pip install -r requirements.txt
-
-# Run the dashboard
-uvicorn gsheets_db.web.app:app --reload
-```
-
-Visit `http://localhost:8000` to access the dashboard.
 
 ## Schema Definition
 
 Define your data structure with type checking and validation:
 
 ```python
-from gsheets_db.core.schema import Schema, Field, FieldType, ValidationRule
+from gsheets_db import Schema, Field, FieldType, ValidationRule
 
-# Custom validation rule
-
-email_validation = ValidationRule(
-        lambda x: "@" in x,
-        "Invalid email format"
-    )
-    schema = Schema("users", [
-        Field(
-        name="email",
-        field_type=FieldType.STRING,
-        required=True,
-        validation_rules=[email_validation]
-    ),
-    Field(
-        name="age",
-        field_type=FieldType.INTEGER,
-        min_value=0,
-        max_value=150
-    ),
-    Field(
-        name="password",
-        field_type=FieldType.STRING,
-        min_length=8,
-        encrypted=True
-    )
+schema = Schema("users", [
+    Field("id", FieldType.INTEGER, required=True, unique=True),
+    Field("email", FieldType.STRING, required=True),
+    Field("age", FieldType.INTEGER, min_value=0, max_value=150),
+    Field("password", FieldType.STRING, required=True, encrypted=True)
 ])
 ```
 
@@ -128,42 +82,32 @@ email_validation = ValidationRule(
 
 ### Field Encryption
 
-Sensitive data can be automatically encrypted:
+Sensitive data is automatically encrypted when the field is marked with `encrypted=True`:
 
 ```python
-# Enable encryption for specific fields
+# Fields marked as encrypted will be automatically handled
 schema = Schema("users", [
     Field("ssn", FieldType.STRING, encrypted=True),
     Field("credit_card", FieldType.STRING, encrypted=True)
 ])
-
-# Provide encryption key when creating manager
-manager = SheetManager(connection, schema, encryption_key="your-encryption-key")
 ```
 
-### Quota Management
-Built-in protection against API limits:
+<!-- ## Contributing
 
-```python
-from gsheets_db.utils.quota_monitor import QuotaMonitor
+We love your input! We want to make contributing to GSheetsDB as easy and transparent as possible, whether it's:
 
-# Customize quota limits
-quota_monitor = QuotaMonitor(
-    'read_requests_per_minute': 1000,
-    'write_requests_per_minute': 60
-)
-```
+- Reporting a bug
+- Discussing the current state of the code
+- Submitting a fix
+- Proposing new features
+- Becoming a maintainer
 
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) first.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Check out our [Contributing Guide](CONTRIBUTING.md) for ways to get started. -->
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+
+[![PyPI version](https://badge.fury.io/py/gsheets_db.svg)](https://badge.fury.io/py/gsheets_db)
+[![Tests](https://github.com/ajmalaksar25/gsheets_db/actions/workflows/tests.yml/badge.svg)](https://github.com/ajmalaksar25/gsheets_db/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/ajmalaksar25/gsheets_db/branch/main/graph/badge.svg)](https://codecov.io/gh/ajmalaksar25/gsheets_db)
