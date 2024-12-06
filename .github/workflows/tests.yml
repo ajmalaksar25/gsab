@@ -8,8 +8,10 @@ on:
 
 jobs:
   test:
+    name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
+      max-parallel: 1  # Run one at a time
       matrix:
         python-version: [3.8, 3.9, "3.10"]
 
@@ -26,11 +28,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest pytest-asyncio pytest-cov
+        pip install -r requirements.txt
         pip install -e .
     
     - name: Create test environment
       run: |
-        # Create tests directory if it doesn't exist
         mkdir -p tests
         
         # Create credentials.json
@@ -55,6 +57,9 @@ jobs:
         GOOGLE_CREDENTIALS_PATH: tests/credentials.json
         ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
       run: |
+        # Add delay before tests to ensure API quotas are reset
+        echo "Waiting 60 seconds before running tests..."
+        sleep 60
         pytest tests/ -v --cov=gsheets_db --cov-report=xml --cov-fail-under=70
     
     - name: Upload coverage to Codecov
