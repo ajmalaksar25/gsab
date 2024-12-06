@@ -1,7 +1,7 @@
 import pytest
 import os
 from dotenv import load_dotenv
-from gsheets_db.auth.authenticator import GoogleAuthenticator, AuthenticationError
+from gsab.auth.authenticator import GoogleAuthenticator, AuthenticationError
 
 # Load environment variables
 load_dotenv()

@@ -1,4 +1,4 @@
-# GSheetsDB
+# Google Sheets as Backend (GSAB)
 
 A Python library that enables using Google Sheets as a database backend with features like schema validation and encryption.
 
@@ -35,7 +35,7 @@ ENCRYPTION_KEY=your-encryption-key
 3. Basic Usage:
 
 ```python
-from gsheets_db import SheetConnection, Schema, Field, FieldType, SheetManager
+from gsab import SheetConnection, Schema, Field, FieldType, SheetManager
 
 # Define your schema
 schema = Schema("users", [
@@ -68,7 +68,7 @@ async def main():
 Define your data structure with type checking and validation:
 
 ```python
-from gsheets_db import Schema, Field, FieldType, ValidationRule
+from gsab import Schema, Field, FieldType, ValidationRule
 
 schema = Schema("users", [
     Field("id", FieldType.INTEGER, required=True, unique=True),
@@ -108,6 +108,6 @@ Check out our [Contributing Guide](CONTRIBUTING.md) for ways to get started. -->
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
 
-[![PyPI version](https://badge.fury.io/py/gsheets_db.svg)](https://badge.fury.io/py/gsheets_db)
-[![Tests](https://github.com/ajmalaksar25/gsheets_db/actions/workflows/tests.yml/badge.svg)](https://github.com/ajmalaksar25/gsheets_db/actions/workflows/tests.yml)
-[![codecov](https://codecov.io/gh/ajmalaksar25/gsheets_db/branch/main/graph/badge.svg)](https://codecov.io/gh/ajmalaksar25/gsheets_db)
+[![PyPI version](https://badge.fury.io/py/gsab.svg)](https://badge.fury.io/py/gsab)
+[![Tests](https://github.com/ajmalaksar25/gsab/actions/workflows/tests.yml/badge.svg)](https://github.com/ajmalaksar25/gsab/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/ajmalaksar25/gsab/branch/main/graph/badge.svg)](https://codecov.io/gh/ajmalaksar25/gsab)

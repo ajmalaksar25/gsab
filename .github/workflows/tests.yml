@@ -60,7 +60,7 @@ jobs:
         # Add delay before tests to ensure API quotas are reset
         echo "Waiting 60 seconds before running tests..."
         sleep 60
-        pytest tests/ -v --cov=gsheets_db --cov-report=xml --cov-fail-under=70
+        pytest tests/ -v --cov=gsab --cov-report=xml --cov-fail-under=70
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v2

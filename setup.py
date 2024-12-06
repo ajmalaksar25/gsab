@@ -1,4 +1,4 @@
-"""Setup script for gsheets_db package."""
+"""Setup script for gsab package."""
 
 from setuptools import setup, find_packages
 
@@ -6,14 +6,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="gsheets_db",
+    name="gsab",
     version="0.1.0",
     author="Ajmal Aksar",
     author_email="ajmalaksar25@gmail.com",
     description="A database-like interface for Google Sheets",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/ajmalaksar25/gsheets_db",
+    url="https://github.com/ajmalaksar25/gsab",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

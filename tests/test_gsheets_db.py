@@ -3,9 +3,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
-from gsheets_db.core.connection import SheetConnection
-from gsheets_db.core.schema import Schema, Field, FieldType
-from gsheets_db.core.sheet_manager import SheetManager
+from gsab.core.connection import SheetConnection
+from gsab.core.schema import Schema, Field, FieldType
+from gsab.core.sheet_manager import SheetManager
 
 # Load environment variables
 load_dotenv()

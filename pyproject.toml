@@ -6,4 +6,4 @@ build-backend = "setuptools.build_meta"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=gsheets_db --cov-report=term-missing" 
+addopts = "-v --cov=gsab --cov-report=term-missing" 

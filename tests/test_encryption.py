@@ -2,7 +2,7 @@ import pytest
 from dotenv import load_dotenv
 import os
 from cryptography.fernet import Fernet
-from gsheets_db.utils.encryption import EncryptionError
+from gsab.utils.encryption import EncryptionError
 
 # Load environment variables
 load_dotenv()
@@ -17,7 +17,7 @@ def encryption_key():
 
 def test_encryption_edge_cases(encryption_key):
     """Test encryption edge cases."""
-    from gsheets_db.utils.encryption import Encryptor
+    from gsab.utils.encryption import Encryptor
     
     encryptor = Encryptor(encryption_key)
     
@@ -48,7 +48,7 @@ def test_encryption_edge_cases(encryption_key):
 
 def test_encryption_various_inputs(encryption_key, test_input):
     """Test encryption with various input types."""
-    from gsheets_db.utils.encryption import Encryptor
+    from gsab.utils.encryption import Encryptor
 
     encryptor = Encryptor(encryption_key)
     encrypted = encryptor.encrypt(test_input)
@@ -57,7 +57,7 @@ def test_encryption_various_inputs(encryption_key, test_input):
 
 def test_encryption_errors(encryption_key):
     """Test encryption error handling."""
-    from gsheets_db.utils.encryption import Encryptor
+    from gsab.utils.encryption import Encryptor
     encryptor = Encryptor(encryption_key)
     
     # Test invalid encrypted data

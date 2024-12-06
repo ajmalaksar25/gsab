@@ -10,8 +10,8 @@ def test_package_installation():
     import cryptography
     
     # Test import
-    import gsheets_db
-    assert hasattr(gsheets_db, "__version__")
+    import gsab
+    assert hasattr(gsab, "__version__")
     
     # Skip pip installation test if running in CI
     if os.environ.get("CI"):

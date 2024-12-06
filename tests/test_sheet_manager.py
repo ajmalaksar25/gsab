@@ -1,9 +1,9 @@
 import pytest
 import os
 from dotenv import load_dotenv
-from gsheets_db.core.connection import SheetConnection
-from gsheets_db.core.schema import Schema, Field, FieldType
-from gsheets_db.core.sheet_manager import SheetManager
+from gsab.core.connection import SheetConnection
+from gsab.core.schema import Schema, Field, FieldType
+from gsab.core.sheet_manager import SheetManager
 from cryptography.fernet import Fernet
 
 # Load environment variables
