@@ -55,7 +55,7 @@ jobs:
         GOOGLE_CREDENTIALS_PATH: tests/credentials.json
         ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
       run: |
-        pytest tests/ -v --cov=gsheets_db --cov-report=xml
+        pytest tests/ -v --cov=gsheets_db --cov-report=xml --cov-fail-under=80
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v2

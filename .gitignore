@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.coveragerc
 .Python
 build/
 develop-eggs/
@@ -16,6 +17,8 @@ parts/
 sdist/
 var/
 wheels/
+.coverage
+__pycache__
 *.egg-info/
 .installed.cfg
 *.egg
