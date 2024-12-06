@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, main ]
 
 jobs:
   test:
@@ -28,32 +28,37 @@ jobs:
         pip install pytest pytest-asyncio pytest-cov
         pip install -e .
     
-    - name: Create service account credentials
+    - name: Create test environment
       run: |
+        # Create tests directory if it doesn't exist
         mkdir -p tests
+        
+        # Create credentials.json
         echo '${{ secrets.GOOGLE_CREDENTIALS }}' > tests/credentials.json
-        # Generate encryption key if not provided
-        if [ -z "${{ secrets.ENCRYPTION_KEY }}" ]; then
-          python -c "from cryptography.fernet import Fernet; print(f'ENCRYPTION_KEY={Fernet.generate_key().decode()}')" > tests/.env
-        else
-          echo "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" > tests/.env
+        
+        # Create .env file with required variables
+        echo "GOOGLE_CREDENTIALS_PATH=tests/credentials.json" > tests/.env
+        echo "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" >> tests/.env
+        
+        # Verify files exist and have content (without revealing sensitive data)
+        if [ ! -s tests/credentials.json ]; then
+          echo "Error: credentials.json is empty"
+          exit 1
         fi
-        echo "GOOGLE_CREDENTIALS_PATH=tests/credentials.json" >> tests/.env
-        # Verify files exist and have content
-        ls -l tests/credentials.json tests/.env
-        test -s tests/credentials.json || (echo "Credentials file is empty" && exit 1)
-        test -s tests/.env || (echo "Env file is empty" && exit 1)
+        if [ ! -s tests/.env ]; then
+          echo "Error: .env is empty"
+          exit 1
+        fi
     
     - name: Run tests
       env:
         GOOGLE_CREDENTIALS_PATH: tests/credentials.json
         ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-        PYTHONPATH: ${{ github.workspace }}
       run: |
-        python -m pytest tests/ --cov=gsheets_db --cov-report=xml -v
+        pytest tests/ -v --cov=gsheets_db --cov-report=xml
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v2
       with:
         file: ./coverage.xml
-        fail_ci_if_error: true 
+        fail_ci_if_error: true

@@ -69,6 +69,18 @@ async def sheet_manager(encryption_key):
     
     if not os.path.exists(credentials_path):
         pytest.skip(f"Credentials file not found at {credentials_path}")
+        
+    # Verify credentials content
+    try:
+        with open(credentials_path, 'r') as f:
+            import json
+            creds = json.load(f)
+            required_fields = ['token_uri', 'client_email', 'private_key']
+            missing = [f for f in required_fields if f not in creds]
+            if missing:
+                pytest.skip(f"Credentials missing required fields: {', '.join(missing)}")
+    except Exception as e:
+        pytest.skip(f"Failed to read credentials: {str(e)}")
     
     connection = SheetConnection(credentials_path=credentials_path)
     await connection.connect()
