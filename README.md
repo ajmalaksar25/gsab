@@ -30,15 +30,17 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 - **Schemas & validation** — typed fields, rules and uniqueness, enforced on every write.
 - **Field encryption** — flag a field `encrypted=True` and it's sealed before it reaches the sheet.
 - **Async CRUD + rich filters** — `insert / read / update / delete` with `$gt / $in / $contains / $regex` and more.
-- **Server-side queries** — `query()` runs the Google Visualization query language (filter, sort, aggregate) on Google's side, not in Python.
+- **Server-side queries** — `query()` runs the Google Visualization query language (filter, sort, aggregate) on Google's side, not in Python. Values come back type-correct.
 - **pandas bridge** — `to_dataframe()` / `from_dataframe()` and `bulk_insert()` for the whole analytics ecosystem.
+- **Native charts** — `chart()` embeds a Google chart in the sheet; or hand `to_dataframe()` to matplotlib/Plotly.
+- **Actionable errors** — Google API errors become clear GSAB exceptions with retry/backoff and token refresh — readable by humans and LLM agents.
 - **Secure tokens** — stored in your OS keychain (keyring), with a 0600-file fallback.
 
 ## Roadmap
 
-**Shipped (v0.2.0):** auth + CLI · schemas, validation & encryption · async CRUD · server-side query · pandas bridge + bulk insert · keychain storage.
+**Shipped (v0.3.0):** auth + CLI · schemas, validation & encryption · async CRUD · type-correct server-side query · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · keychain storage.
 
-**Coming next:** LLM-friendly errors + retry/backoff · native in-sheet charts + Plotly/Dash helpers · MCP server (use your sheets from Claude) · terminal UI · real-time / reactive mode · one-click hosted sign-in.
+**Coming next:** MCP server (use your sheets from Claude) · terminal UI · real-time / reactive mode · server-side date filters · one-click hosted sign-in.
 
 Live roadmap → [gsab.ajmalaksar.com/#roadmap](https://gsab.ajmalaksar.com/#roadmap).
 

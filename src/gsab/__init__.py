@@ -4,7 +4,7 @@ A database-like interface for Google Sheets: schemas, validation, field
 encryption and async CRUD, with auto-detecting authentication.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from .auth import login, logout, resolve_credentials, status
 from .core.connection import SheetConnection

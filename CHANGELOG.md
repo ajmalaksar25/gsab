@@ -3,6 +3,24 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.3.0] — 2026-06-23
+
+Type-correct storage (so server-side queries actually work), an LLM-friendly error layer, and native charts — validated live end-to-end and from a clean external install.
+
+### Added
+- LLM-friendly error layer: Google API errors map to clear GSAB exceptions — `NotFoundError`, `PermissionDeniedError`, `ValidationError`, `APIError` (plus existing `AuthError`, `QuotaExceededError`, `ConnectionError`) — with actionable messages for humans and LLM agents. Automatic retry/backoff on `429`/`5xx` and transient network drops/timeouts.
+- Native in-sheet charts: `chart()` embeds a Google chart (COLUMN/BAR/LINE/AREA/SCATTER/COMBO/STEPPED_AREA/PIE); Python-side plots via `to_dataframe()`.
+
+### Fixed
+- **Server-side `query()` returned nothing for numeric/date filters**: cells were written as strings, so Google saw text. Values are now stored in their native type — numbers as numbers — so gviz `WHERE`/`ORDER BY` work.
+- `delete()` now targets each row by its true sheet index, so duplicate rows are deleted correctly (was a fragile value-equality lookup).
+- `read()` / `to_dataframe()` no longer leak the internal `_row_index` field.
+- A failed/revoked token refresh now raises a friendly `AuthError` ("run `gsab auth login`") instead of a raw `RefreshError`.
+
+### Changed
+- `query()` returns columns that map to a schema field in that field's Python type (and decrypted), matching `read()`; aggregates stay gviz-native.
+- Strings are stored as inert text under `RAW` input (a leading `=` is never an executable formula).
+
 ## [0.2.0] — 2026-06-23
 
 Full rebuild from the 0.1.0 prototype into an installable library + CLI.
