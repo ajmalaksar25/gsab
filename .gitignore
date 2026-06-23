@@ -49,3 +49,11 @@ tests/credentials.json
 dist/
 build/
 *.egg-info/ 
+# GSAB local
+_legacy/
+.gsab/
+*.pickle
+token.pickle
+client_secret*.json
+*service-account*.json
+

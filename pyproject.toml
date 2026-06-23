@@ -1,9 +1,81 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gsab"
+dynamic = ["version"]
+description = "Google Sheets as a Backend — a database-like interface for Google Sheets."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE.md" }
+authors = [{ name = "Ajmal Aksar", email = "ajmalaksar25@gmail.com" }]
+keywords = ["google-sheets", "database", "backend", "spreadsheet", "orm", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Database",
+]
+dependencies = [
+    "google-api-python-client>=2.31.0",
+    "google-auth>=2.3.3",
+    "google-auth-oauthlib>=0.5.0",
+    "cryptography>=35.0.0",
+    "python-dotenv>=0.19.2",
+    "typer>=0.12.0",
+    "platformdirs>=3.0.0",
+    "keyring>=24.0",
+]
+
+[project.optional-dependencies]
+server = [
+    "fastapi>=0.68.0",
+    "uvicorn>=0.15.0",
+    "python-multipart>=0.0.5",
+    "jinja2>=3.0.0",
+    "aiofiles>=0.8.0",
+]
+tui = ["textual>=0.50.0"]
+mcp = ["mcp>=1.0.0"]
+pandas = ["pandas>=2.0"]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ajmalaksar25/gsab"
+Repository = "https://github.com/ajmalaksar25/gsab"
+Issues = "https://github.com/ajmalaksar25/gsab/issues"
+
+[project.scripts]
+gsab = "gsab.cli:app"
+
+[tool.hatch.version]
+path = "src/gsab/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gsab"]
+# Ship the bundled Desktop OAuth client (injected at publish time; kept out of VCS).
+artifacts = ["src/gsab/auth/client_secret.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=gsab --cov-report=term-missing" 
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["B008"]  # Typer uses function calls (typer.Option(...)) in defaults
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B017"]  # legacy integration tests assert broad Exception; rewritten in the test-suite task

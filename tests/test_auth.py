@@ -1,10 +1,13 @@
-import pytest
 import os
+
+import pytest
 from dotenv import load_dotenv
-from gsab.auth.authenticator import GoogleAuthenticator, AuthenticationError
+
+from gsab.auth.authenticator import AuthenticationError, GoogleAuthenticator
 
 # Load environment variables
 load_dotenv()
+
 
 @pytest.fixture
 def credentials_path():
@@ -14,20 +17,22 @@ def credentials_path():
         pytest.skip("Google credentials not available")
     return path
 
+
 def test_authenticator_initialization(credentials_path):
     """Test authenticator initialization."""
     auth = GoogleAuthenticator(credentials_path)
     assert auth.creds is None
 
+
 def test_authentication_process(credentials_path):
     """Test authentication process."""
     auth = GoogleAuthenticator(credentials_path)
-    
+
     # Test authentication
     creds = auth.authenticate()
     assert creds is not None
     assert creds.valid
-    
+
     # Test invalid credentials
     with pytest.raises(AuthenticationError):
         invalid_auth = GoogleAuthenticator("invalid_path")
