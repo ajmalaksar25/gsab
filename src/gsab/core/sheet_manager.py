@@ -61,7 +61,30 @@ def _match_op(actual: Any, op: str, target: Any) -> bool:
 
 
 class SheetManager:
-    """Manages CRUD operations for Google Sheets."""
+    """Async CRUD over one Google Sheet tab, driven by a `Schema`.
+
+    Binds a `SheetConnection` to a `Schema` (one tab = one table) and exposes
+    create / insert / read / update / delete, server-side `query()`, the pandas
+    bridge (`to_dataframe()` / `from_dataframe()`) and native `chart()`.
+    Validation runs on every write; fields flagged `encrypted=True` are sealed
+    before they reach the sheet and decrypted on read.
+
+    Args:
+        connection: a `SheetConnection` (connected lazily on first use).
+        schema: the `Schema` describing the tab.
+        encryption_key: Fernet key; required only if the schema has encrypted fields.
+
+    Example:
+        db = SheetManager(connection, schema, encryption_key=key)
+        await db.create_sheet("My App DB")
+        await db.insert({"id": 1, "name": "Ada"})
+        rows = await db.read({"id": {"$gte": 1}})
+
+    Every method raises a subclass of `GSABError` on failure — `ValidationError`
+    for bad input, `NotFoundError` for a missing sheet, `QuotaExceededError` when
+    rate-limited. Transient errors (429/5xx, dropped connections) are retried
+    automatically with backoff.
+    """
 
     def __init__(
         self, connection: SheetConnection, schema: Schema, encryption_key: Optional[str] = None
@@ -165,7 +188,16 @@ class SheetManager:
             return str(value)
 
     async def insert(self, data: Dict[str, Any]) -> None:
-        """Insert a single record."""
+        """Insert a single record.
+
+        Args:
+            data: field name -> value; validated against the schema first.
+                Missing optional fields use their ``default`` (or an empty cell).
+
+        Raises:
+            ValidationError: the record fails schema validation, or no sheet is bound.
+            GSABError: on an API failure (e.g. NotFoundError, QuotaExceededError).
+        """
         await self.bulk_insert([data])
 
     async def bulk_insert(self, records: List[Dict[str, Any]]) -> int:
@@ -218,7 +250,24 @@ class SheetManager:
         ]
 
     async def read(self, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Read records matching the filters, as clean dicts keyed by field name."""
+        """Read records matching the filters, as dicts keyed by field name.
+
+        Filtering happens in Python (every row is fetched). For server-side
+        filtering/sorting/aggregation use `query()` instead.
+
+        Args:
+            filters: optional ``{field: value}`` (equality) or ``{field: {op: value}}``.
+                Operators: ``$eq $ne $gt $gte $lt $lte $in $nin $contains $regex``.
+                Omit to read every row.
+
+        Returns:
+            A list of dicts, one per matching row, with values in their schema
+            types (encrypted fields are decrypted).
+
+        Raises:
+            ValidationError: no sheet is bound (call `create_sheet()` first).
+            GSABError: on an API failure (NotFoundError, PermissionDeniedError, …).
+        """
         records = await self._read_indexed(filters)
         for record in records:
             record.pop("_row_index", None)

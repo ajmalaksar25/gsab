@@ -6,6 +6,14 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 
 class FieldType(Enum):
+    """Column data types.
+
+    Values are converted and validated on every write and coerced back on read:
+    ``INTEGER`` -> int, ``FLOAT`` -> float, ``BOOLEAN`` -> bool, ``DATE`` /
+    ``DATETIME`` -> date/datetime, ``JSON`` -> parsed object, ``STRING`` -> str.
+    A field with ``encrypted=True`` is sealed (Fernet) before it reaches the sheet.
+    """
+
     STRING = "string"
     INTEGER = "integer"
     FLOAT = "float"
@@ -26,6 +34,22 @@ class ValidationRule:
 
 @dataclass
 class Field:
+    """One column in a `Schema`.
+
+    Args:
+        name: the column header.
+        field_type: a `FieldType`.
+        required: reject writes that omit this field. Defaults to True.
+        unique: advisory flag that values should be unique.
+        default: value used when the field is omitted on insert.
+        min_length / max_length: string-length bounds.
+        pattern: a regex the value must fully satisfy.
+        min_value / max_value: numeric bounds.
+        validation_rules: extra `ValidationRule` checks.
+        encrypted: seal the value with Fernet before writing; requires an
+            `encryption_key` on the `SheetManager`.
+    """
+
     name: str
     field_type: FieldType
     required: bool = True
