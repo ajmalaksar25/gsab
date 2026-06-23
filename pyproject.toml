@@ -58,10 +58,14 @@ gsab = "gsab.cli:app"
 [tool.hatch.version]
 path = "src/gsab/__init__.py"
 
+[tool.hatch.build]
+# Ship the bundled Desktop OAuth client (injected at publish time; kept out of VCS).
+# Must be global, not wheel-only: `build` makes the wheel FROM the sdist, so the
+# sdist has to include it too — otherwise the client never reaches the wheel.
+artifacts = ["src/gsab/auth/client_secret.json"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/gsab"]
-# Ship the bundled Desktop OAuth client (injected at publish time; kept out of VCS).
-artifacts = ["src/gsab/auth/client_secret.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

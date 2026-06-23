@@ -3,6 +3,11 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.3.1] — 2026-06-23
+
+### Fixed
+- Bundled OAuth client was missing from the published wheel, so a fresh `pip install gsab` could not `gsab auth login` without manual Google Cloud setup. Root cause: `build` makes the wheel from the sdist, but the client artifact was declared only for the wheel target, so it was excluded from the sdist and never reached the wheel. It's now shipped in both the sdist and the wheel. (Affected 0.2.0–0.3.0.)
+
 ## [0.3.0] — 2026-06-23
 
 Type-correct storage (so server-side queries actually work), an LLM-friendly error layer, and native charts — validated live end-to-end and from a clean external install.
