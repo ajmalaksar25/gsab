@@ -17,12 +17,14 @@ import os
 from pathlib import Path
 from typing import Optional, Sequence
 
+from google.auth.exceptions import RefreshError, TransportError
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 from platformdirs import user_config_dir
 
 from ..exceptions.custom_exceptions import AuthError
+from ..exceptions.custom_exceptions import ConnectionError as GSABConnectionError
 
 # Easy mode (default): non-sensitive. GSAB only touches the sheets it creates or
 # the user explicitly opens — no app-verification wall, no scary consent screen.
@@ -125,7 +127,17 @@ def _load_cached(scopes: Optional[Sequence[str]]) -> Optional[Credentials]:
         return None
     creds = Credentials.from_authorized_user_info(json.loads(data), _scopes(scopes))
     if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
+        try:
+            creds.refresh(Request())
+        except RefreshError as e:
+            raise AuthError(
+                "Your saved Google session has expired or was revoked. "
+                "Run `gsab auth login` to sign in again."
+            ) from e
+        except TransportError as e:
+            raise GSABConnectionError(
+                f"Could not reach Google to refresh your session ({e}). Check your connection."
+            ) from e
         _save(creds)
     return creds if creds and creds.valid else None
 

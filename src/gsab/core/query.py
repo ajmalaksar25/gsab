@@ -7,6 +7,7 @@ Visualization API Query Language (a SQL subset) instead of fetching every row.
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Optional
 from urllib.parse import quote
 
@@ -15,10 +16,17 @@ _GVIZ_URL = "https://docs.google.com/spreadsheets/d/{id}/gviz/tq"
 
 def parse_gviz_response(text: str) -> list:
     """Parse the JSONP-wrapped gviz payload into row dicts keyed by column label."""
+    from ..exceptions.custom_exceptions import ValidationError
+
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end == -1:
         raise ValueError(f"Unexpected gviz response: {text[:120]!r}")
-    table = json.loads(text[start : end + 1]).get("table", {})
+    payload = json.loads(text[start : end + 1])
+    if payload.get("status") == "error":
+        err = (payload.get("errors") or [{}])[0]
+        msg = err.get("detailed_message") or err.get("message") or "invalid query"
+        raise ValidationError(f"Query rejected by Google: {msg}. Columns are referenced by letter.")
+    table = payload.get("table", {})
     cols = [(c.get("label") or c.get("id") or f"c{i}") for i, c in enumerate(table.get("cols", []))]
     rows = []
     for r in table.get("rows", []):
@@ -39,12 +47,43 @@ def build_gviz_url(
 
 
 def run_gviz_query(
-    credentials: Any, spreadsheet_id: str, sql: str, *, sheet: Optional[str] = None
+    credentials: Any,
+    spreadsheet_id: str,
+    sql: str,
+    *,
+    sheet: Optional[str] = None,
+    retries: int = 4,
+    base_delay: float = 0.5,
+    timeout: float = 30,
 ) -> list:
-    """Execute a gviz query against a spreadsheet tab and return row dicts."""
+    """Execute a gviz query against a spreadsheet tab and return row dicts.
+
+    Retries transient network failures and 429/5xx responses with backoff, and
+    maps a final failure to a friendly GSAB exception.
+    """
     from google.auth.transport.requests import AuthorizedSession
+    from requests.exceptions import ChunkedEncodingError, Timeout
+    from requests.exceptions import ConnectionError as ReqConnError
+
+    from ..exceptions.custom_exceptions import ConnectionError as GSABConnectionError
+    from ..utils.errors import RETRYABLE_STATUSES, error_for_status
 
     url = build_gviz_url(spreadsheet_id, sql, sheet=sheet)
-    resp = AuthorizedSession(credentials).get(url)
-    resp.raise_for_status()
-    return parse_gviz_response(resp.text)
+    session = AuthorizedSession(credentials)
+    transient = (ReqConnError, Timeout, ChunkedEncodingError)
+    for attempt in range(retries + 1):
+        try:
+            resp = session.get(url, timeout=timeout)
+        except transient as e:
+            if attempt < retries:
+                time.sleep(base_delay * 2**attempt)
+                continue
+            raise GSABConnectionError(
+                f"Network error running query ({e}). Check your connection and try again."
+            ) from e
+        if resp.status_code in RETRYABLE_STATUSES and attempt < retries:
+            time.sleep(base_delay * 2**attempt)
+            continue
+        if resp.status_code >= 400:
+            raise error_for_status(resp.status_code, resp.text[:200].strip() or resp.reason)
+        return parse_gviz_response(resp.text)

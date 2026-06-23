@@ -1,19 +1,27 @@
 """GSAB exceptions."""
 
 from .custom_exceptions import (
+    APIError,
     AuthError,
     ConnectionError,
     EncryptionError,
     GSABError,
     GSheetsDBException,
+    NotFoundError,
+    PermissionDeniedError,
     QuotaExceededError,
+    ValidationError,
 )
 
 __all__ = [
     "GSheetsDBException",
     "GSABError",
-    "ConnectionError",
-    "QuotaExceededError",
-    "EncryptionError",
     "AuthError",
+    "ConnectionError",
+    "NotFoundError",
+    "PermissionDeniedError",
+    "QuotaExceededError",
+    "ValidationError",
+    "EncryptionError",
+    "APIError",
 ]

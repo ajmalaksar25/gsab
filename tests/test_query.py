@@ -74,5 +74,32 @@ def test_encode_row():
         ],
     )
     db = SheetManager(None, schema)
-    assert db._encode_row({"id": 5, "name": "Ada"}) == ["5", "Ada"]
-    assert db._encode_row({"id": 7}) == ["7", ""]  # missing optional -> empty cell
+    # Typed values: integers stay int (so Google stores a real number), strings stay str.
+    assert db._encode_row({"id": 5, "name": "Ada"}) == [5, "Ada"]
+    assert db._encode_row({"id": 7}) == [7, ""]  # missing optional -> empty cell
+
+
+def test_encode_row_preserves_native_types():
+    """Numbers/bools must NOT be stringified — that broke server-side numeric queries."""
+    from gsab import Field, FieldType, Schema, SheetManager
+
+    schema = Schema(
+        "t",
+        [
+            Field("qty", FieldType.INTEGER, required=True),
+            Field("price", FieldType.FLOAT, required=True),
+            Field("active", FieldType.BOOLEAN, required=True),
+            Field("note", FieldType.STRING, required=False),
+        ],
+    )
+    db = SheetManager(None, schema)
+    row = db._encode_row({"qty": 3, "price": 9.5, "active": True, "note": "=cmd"})
+    assert row == [3, 9.5, True, "=cmd"]  # leading '=' stays inert text under RAW
+    assert [type(v).__name__ for v in row] == ["int", "float", "bool", "str"]
+
+    # update() path maps each to the right userEnteredValue key
+    fields = {f.name: f for f in schema.fields}
+    assert db._user_entered(fields["qty"], 3) == {"numberValue": 3}
+    assert db._user_entered(fields["price"], 9.5) == {"numberValue": 9.5}
+    assert db._user_entered(fields["active"], True) == {"boolValue": True}
+    assert db._user_entered(fields["note"], "=cmd") == {"stringValue": "=cmd"}
