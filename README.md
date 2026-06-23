@@ -34,11 +34,12 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 - **pandas bridge** — `to_dataframe()` / `from_dataframe()` and `bulk_insert()` for the whole analytics ecosystem.
 - **Native charts** — `chart()` embeds a Google chart in the sheet; or hand `to_dataframe()` to matplotlib/Plotly.
 - **Actionable errors** — Google API errors become clear GSAB exceptions with retry/backoff and token refresh — readable by humans and LLM agents.
+- **Installable agent skills** — `gsab skill install` drops GSAB skills into `.claude/skills` (or `--portable` for any LLM) so your coding agent knows the real API.
 - **Secure tokens** — stored in your OS keychain (keyring), with a 0600-file fallback.
 
 ## Roadmap
 
-**Shipped (v0.3.2):** auth + CLI · schemas, validation & encryption · async CRUD · type-correct server-side query · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · keychain storage.
+**Shipped (v0.4.0):** auth + CLI · schemas, validation & encryption · async CRUD · type-correct server-side query · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · keychain storage.
 
 **Coming next:** MCP server (use your sheets from Claude) · terminal UI · real-time / reactive mode · server-side date filters · one-click hosted sign-in.
 

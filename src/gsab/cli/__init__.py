@@ -6,6 +6,10 @@ Entry point declared in pyproject as ``gsab = "gsab.cli:app"``.
 from __future__ import annotations
 
 import json
+import re
+import shutil
+from importlib.resources import files
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -105,6 +109,104 @@ def auth_logout() -> None:
         typer.secho("Logged out (token removed).", fg=typer.colors.GREEN)
     else:
         typer.echo("No cached token to remove.")
+
+
+skill_app = typer.Typer(
+    help="Install GSAB skills so your coding agent (Claude Code, etc.) knows how to use GSAB.",
+    no_args_is_help=True,
+)
+app.add_typer(skill_app, name="skill")
+
+
+def _skills_dir() -> Path:
+    """Filesystem path to the skills bundled in the installed package."""
+    return Path(str(files("gsab").joinpath("skills")))
+
+
+def _skill_dirs() -> list[Path]:
+    root = _skills_dir()
+    return sorted(d for d in root.iterdir() if d.is_dir() and (d / "SKILL.md").exists())
+
+
+def _skill_description(skill_md: Path) -> str:
+    """One-line gist from a SKILL.md `description` frontmatter field."""
+    text = skill_md.read_text(encoding="utf-8")
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        fm = text[3:end] if end != -1 else text
+        m = re.search(r"description:\s*>?-?\s*\n?\s*(.+)", fm)
+        if m:
+            return " ".join(m.group(1).split())[:96]
+    return ""
+
+
+def _strip_frontmatter(text: str) -> str:
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end != -1:
+            return text[end + 4 :].lstrip("\n")
+    return text
+
+
+def _portable_guide(skill_dirs: list[Path]) -> str:
+    """Concatenate the skills into one paste-into-any-LLM Markdown file."""
+    parts = ["# GSAB — skills bundle (paste into ChatGPT, Codex, Cursor or any LLM)\n"]
+    for d in skill_dirs:
+        for fname in ("SKILL.md", "reference.md", "recipes.md"):
+            f = d / fname
+            if f.exists():
+                parts.append(_strip_frontmatter(f.read_text(encoding="utf-8")).strip())
+    return "\n\n---\n\n".join(parts) + "\n"
+
+
+@skill_app.command("list")
+def skill_list() -> None:
+    """List the GSAB skills available to install."""
+    for d in _skill_dirs():
+        typer.echo(f"  {d.name:14} {_skill_description(d / 'SKILL.md')}")
+
+
+@skill_app.command("install")
+def skill_install(
+    project: bool = typer.Option(
+        False,
+        "--project",
+        help="Install into ./.claude/skills (this repo) instead of ~/.claude/skills.",
+    ),
+    portable: bool = typer.Option(
+        False,
+        "--portable",
+        help="Also write GSAB_LLMS.md — one file to paste into ChatGPT/Codex/Cursor/any LLM.",
+    ),
+    path: Optional[str] = typer.Option(
+        None, "--path", help="Install into a custom skills directory."
+    ),
+) -> None:
+    """Install the GSAB skills so your coding agent knows how to use GSAB."""
+    if path:
+        target = Path(path)
+    elif project:
+        target = Path.cwd() / ".claude" / "skills"
+    else:
+        target = Path.home() / ".claude" / "skills"
+
+    skill_dirs = _skill_dirs()
+    target.mkdir(parents=True, exist_ok=True)
+    for d in skill_dirs:
+        dest = target / d.name
+        shutil.rmtree(dest, ignore_errors=True)
+        shutil.copytree(d, dest)
+
+    typer.secho(f"Installed {len(skill_dirs)} skill(s) to {target}", fg=typer.colors.GREEN)
+    for d in skill_dirs:
+        typer.echo(f"  • {d.name}")
+
+    if portable:
+        out = Path.cwd() / "GSAB_LLMS.md"
+        out.write_text(_portable_guide(skill_dirs), encoding="utf-8")
+        typer.echo(f"\nWrote {out} — paste it into ChatGPT, Codex, Cursor or any LLM.")
+
+    typer.echo("\nOpen your project in Claude Code; the skills are auto-discovered.")
 
 
 if __name__ == "__main__":

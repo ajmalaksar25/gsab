@@ -3,6 +3,14 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.4.0] — 2026-06-24
+
+Get productive faster, and let coding agents use GSAB.
+
+### Added
+- **Installable skills**: `gsab skill install` drops GSAB skills into `~/.claude/skills` (or `.claude/skills` with `--project`) so Claude Code and other coding agents know the real GSAB API. `--portable` writes a single `GSAB_LLMS.md` to paste into ChatGPT / Codex / Cursor / any LLM. `gsab skill list` shows what's available. Ships two skills — `gsab` (core usage + API reference + recipes) and `gsab-fastapi` (a working FastAPI-on-GSAB CRUD pattern) — bundled in the wheel.
+- `gsab help [command]` — works like `--help` (people expect `gsab help`).
+
 ## [0.3.2] — 2026-06-23
 
 ### Fixed

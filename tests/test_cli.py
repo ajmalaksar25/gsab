@@ -29,3 +29,27 @@ def test_version():
     r = runner.invoke(app, ["version"])
     assert r.exit_code == 0
     assert "gsab" in r.output
+
+
+def test_skill_list():
+    r = runner.invoke(app, ["skill", "list"])
+    assert r.exit_code == 0
+    assert "gsab" in r.output and "gsab-fastapi" in r.output
+
+
+def test_skill_install(tmp_path):
+    r = runner.invoke(app, ["skill", "install", "--path", str(tmp_path)])
+    assert r.exit_code == 0
+    assert (tmp_path / "gsab" / "SKILL.md").exists()
+    assert (tmp_path / "gsab" / "reference.md").exists()
+    assert (tmp_path / "gsab" / "recipes.md").exists()
+    assert (tmp_path / "gsab-fastapi" / "SKILL.md").exists()
+
+
+def test_skill_install_portable(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    r = runner.invoke(app, ["skill", "install", "--path", str(tmp_path / "skills"), "--portable"])
+    assert r.exit_code == 0
+    guide = tmp_path / "GSAB_LLMS.md"
+    assert guide.exists()
+    assert "GSAB" in guide.read_text(encoding="utf-8")

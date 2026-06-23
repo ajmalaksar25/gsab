@@ -40,7 +40,7 @@ written to be actionable for people and LLM agents alike.
 Full documentation: https://gsab.ajmalaksar.com/docs
 """
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"
 
 from .auth import login, logout, resolve_credentials, status
 from .core.connection import SheetConnection
