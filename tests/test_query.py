@@ -61,3 +61,18 @@ def test_match_op(actual, op, target, expected):
 def test_match_op_unknown():
     with pytest.raises(ValueError):
         _match_op(1, "$wat", 1)
+
+
+def test_encode_row():
+    from gsab import Field, FieldType, Schema, SheetManager
+
+    schema = Schema(
+        "t",
+        [
+            Field("id", FieldType.INTEGER, required=True),
+            Field("name", FieldType.STRING, required=False),
+        ],
+    )
+    db = SheetManager(None, schema)
+    assert db._encode_row({"id": 5, "name": "Ada"}) == ["5", "Ada"]
+    assert db._encode_row({"id": 7}) == ["7", ""]  # missing optional -> empty cell

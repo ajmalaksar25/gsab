@@ -70,6 +70,7 @@ def auth_status(
         raise typer.Exit()
     state = "logged in" if info["logged_in"] and info["valid"] else "not logged in"
     typer.echo(f"Status:          {state}")
+    typer.echo(f"Storage:         {info.get('storage', 'file')}")
     typer.echo(f"Token cache:     {info['token_cache']}")
     typer.echo(f"Service account: {info['service_account'] or '-'}")
     typer.echo(f"Client secrets:  {info['client_secrets'] or '-'}")

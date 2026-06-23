@@ -92,80 +92,54 @@ class SheetManager:
             logger.error(f"Failed to create sheet: {str(e)}")
             raise
 
-    async def insert(self, data: Dict[str, Any]) -> None:
-        """Insert a record into the sheet."""
-        if not self.sheet_id:
-            raise Exception("Sheet not created")
-
-        # Validate data
+    def _encode_row(self, data: Dict[str, Any]) -> List[str]:
+        """Validate one record and return its cell values (encrypting flagged fields once)."""
         errors = self.schema.validate(data)
         if errors:
             raise ValueError(f"Validation errors: {', '.join(errors)}")
-
-        try:
-            validated_data = self._validate_data(data)
-            values = []
-
-            # Prepare row data with encryption
-            for field in self.schema.fields:
-                value = validated_data.get(field.name, "")
-
-                # Handle encryption for fields marked as encrypted
-                if field.encrypted and self.encryptor and value:
-                    try:
-                        value = self.encryptor.encrypt(value)
-                        logger.info(f"Encrypted field {field.name}")
-                    except Exception as e:
-                        logger.error(f"Failed to encrypt field {field.name}: {str(e)}")
-                        raise
-
-                values.append(str(value))
-
-            body = {"values": [values]}
-
-            self.connection.service.spreadsheets().values().append(
-                spreadsheetId=self.sheet_id,
-                range=f"{self.schema.name}!A:A",
-                valueInputOption="RAW",
-                body=body,
-            ).execute()
-
-            logger.info(f"Inserted new row: {data}")
-
-        except ValueError as e:
-            logger.error(f"Validation error: {str(e)}")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to insert data: {str(e)}")
-            raise
-
-    def _validate_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate data against schema."""
-        validated = {}
-
+        row = []
         for field in self.schema.fields:
             value = data.get(field.name)
-
-            # Validate field
-            errors = self.schema.validate_value(field.name, value)
-            if errors:
-                raise ValueError(f"Validation errors for {field.name}: {', '.join(errors)}")
-
             if value is None:
-                if field.required:
-                    if field.default is not None:
-                        validated[field.name] = field.default
-                    else:
-                        raise ValueError(f"Required field missing: {field.name}")
-            else:
-                # Convert and possibly encrypt value
-                converted_value = self.schema._convert_value(value, field.field_type)
-                if field.encrypted and self.encryptor:
-                    validated[field.name] = self.encryptor.encrypt(converted_value)
-                else:
-                    validated[field.name] = converted_value
+                value = field.default
+            if value is None or value == "":
+                row.append("")
+                continue
+            value = self.schema._convert_value(value, field.field_type)
+            if field.encrypted and self.encryptor:
+                value = self.encryptor.encrypt(value)
+            row.append(str(value))
+        return row
 
-        return validated
+    async def insert(self, data: Dict[str, Any]) -> None:
+        """Insert a single record."""
+        await self.bulk_insert([data])
+
+    async def bulk_insert(self, records: List[Dict[str, Any]]) -> int:
+        """Insert many records in a single append call. Returns the number inserted."""
+        if not self.sheet_id:
+            raise ValueError("Sheet not created")
+        rows = [self._encode_row(r) for r in records]
+        if not rows:
+            return 0
+        self.connection.service.spreadsheets().values().append(
+            spreadsheetId=self.sheet_id,
+            range=f"{self.schema.name}!A:A",
+            valueInputOption="RAW",
+            body={"values": rows},
+        ).execute()
+        logger.info("Inserted %d row(s)", len(rows))
+        return len(rows)
+
+    async def from_dataframe(self, df) -> int:
+        """Insert every row of a pandas DataFrame in bulk. Returns the number inserted."""
+        return await self.bulk_insert(df.to_dict("records"))
+
+    async def to_dataframe(self, filters: Optional[Dict[str, Any]] = None):
+        """Read records into a pandas DataFrame (install the `pandas` extra)."""
+        import pandas as pd
+
+        return pd.DataFrame(await self.read(filters))
 
     def _create_header_row(self) -> List[Dict]:
         """

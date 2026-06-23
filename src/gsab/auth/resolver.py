@@ -12,6 +12,7 @@ cover a person signing in on their own machine.
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Optional, Sequence
@@ -67,19 +68,62 @@ def _client_secrets(explicit: Optional[str] = None) -> Optional[str]:
     return _bundled_client_secret()
 
 
+_KEYRING_SERVICE = "gsab"
+_KEYRING_USER = "oauth-token"
+
+
+def _keyring():
+    """Return a usable keyring backend (OS keychain), or None to fall back to a file."""
+    try:
+        import keyring
+        from keyring.backends.fail import Keyring as FailKeyring
+
+        if isinstance(keyring.get_keyring(), FailKeyring):
+            return None
+        return keyring
+    except Exception:
+        return None
+
+
 def _save(creds: Credentials) -> None:
+    """Store the token in the OS keychain when available, else a 0600 file."""
+    data = creds.to_json()
+    kr = _keyring()
+    if kr:
+        try:
+            kr.set_password(_KEYRING_SERVICE, _KEYRING_USER, data)
+            TOKEN_PATH.unlink(missing_ok=True)
+            return
+        except Exception:
+            pass
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    TOKEN_PATH.write_text(creds.to_json())
+    TOKEN_PATH.write_text(data)
     try:
         os.chmod(TOKEN_PATH, 0o600)
     except OSError:
         pass
 
 
+def _read_token() -> Optional[str]:
+    """Return the stored token JSON (keychain first, then file), or None."""
+    kr = _keyring()
+    if kr:
+        try:
+            data = kr.get_password(_KEYRING_SERVICE, _KEYRING_USER)
+            if data:
+                return data
+        except Exception:
+            pass
+    if TOKEN_PATH.exists():
+        return TOKEN_PATH.read_text()
+    return None
+
+
 def _load_cached(scopes: Optional[Sequence[str]]) -> Optional[Credentials]:
-    if not TOKEN_PATH.exists():
+    data = _read_token()
+    if not data:
         return None
-    creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), _scopes(scopes))
+    creds = Credentials.from_authorized_user_info(json.loads(data), _scopes(scopes))
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
         _save(creds)
@@ -158,17 +202,19 @@ def login(
 
 def status(scopes: Optional[Sequence[str]] = None) -> dict:
     """Report available credential sources (no network calls beyond ADC lookup)."""
+    token = _read_token()
     info = {
+        "storage": "keyring" if _keyring() else "file",
         "token_cache": str(TOKEN_PATH),
-        "logged_in": TOKEN_PATH.exists(),
+        "logged_in": token is not None,
         "service_account": _service_account_file(),
         "client_secrets": _client_secrets(),
         "adc_available": _try_adc(scopes) is not None,
         "valid": False,
     }
-    if info["logged_in"]:
+    if token:
         try:
-            creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), _scopes(scopes))
+            creds = Credentials.from_authorized_user_info(json.loads(token), _scopes(scopes))
             info["valid"] = bool(creds and (creds.valid or creds.refresh_token))
         except Exception:
             info["valid"] = False
@@ -176,8 +222,17 @@ def status(scopes: Optional[Sequence[str]] = None) -> dict:
 
 
 def logout() -> bool:
-    """Delete the cached token. Returns True if a token was removed."""
+    """Delete the cached token from the keychain and/or file. True if anything was removed."""
+    removed = False
+    kr = _keyring()
+    if kr:
+        try:
+            if kr.get_password(_KEYRING_SERVICE, _KEYRING_USER):
+                kr.delete_password(_KEYRING_SERVICE, _KEYRING_USER)
+                removed = True
+        except Exception:
+            pass
     if TOKEN_PATH.exists():
         TOKEN_PATH.unlink()
-        return True
-    return False
+        removed = True
+    return removed
