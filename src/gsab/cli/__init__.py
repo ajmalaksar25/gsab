@@ -6,6 +6,7 @@ Entry point declared in pyproject as ``gsab = "gsab.cli:app"``.
 from __future__ import annotations
 
 import json
+from typing import Optional
 
 import typer
 
@@ -31,6 +32,26 @@ app.add_typer(auth_app, name="auth")
 def version() -> None:
     """Show the GSAB version."""
     typer.echo(f"gsab {__version__}")
+
+
+@app.command("help")
+def help_cmd(
+    ctx: typer.Context,
+    command: Optional[str] = typer.Argument(None, help="Show help for this command."),
+) -> None:
+    """Show help for gsab, or a specific command (same as --help)."""
+    group = ctx.parent.command
+    if not command:
+        typer.echo(ctx.parent.get_help())
+        return
+    sub = group.get_command(ctx.parent, command)
+    if sub is None:
+        typer.secho(f"No such command '{command}'. Try `gsab help`.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    # Build a context for the subcommand without importing click directly
+    # (typer vendors it): ctx.parent.__class__ is the click Context class.
+    sub_ctx = ctx.parent.__class__(sub, info_name=command, parent=ctx.parent)
+    typer.echo(sub.get_help(sub_ctx))
 
 
 @auth_app.command("login")
