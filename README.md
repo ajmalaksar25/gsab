@@ -13,7 +13,7 @@ A Python library that enables using Google Sheets as a database backend with fea
 ## Installation
 
 ```bash
-pip install gsheets-db
+pip install gsab
 ```
 
 ## Quick Start
