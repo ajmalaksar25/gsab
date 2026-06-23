@@ -186,6 +186,22 @@ def resolve_credentials(
     )
 
 
+def _load_client_config(path: str) -> dict:
+    """Read an OAuth client-secrets JSON file, tolerating a UTF-8 BOM.
+
+    google-auth-oauthlib's own loader uses plain ``json.load``, which rejects a
+    leading BOM (some editors/tools add one). Reading as ``utf-8-sig`` strips it.
+    """
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            return json.load(f)
+    except (OSError, ValueError) as e:
+        raise AuthError(
+            f"Could not read OAuth client secrets at {path}: {e}. "
+            "The file must be valid JSON for an installed/Desktop OAuth client."
+        ) from e
+
+
 def login(
     scopes: Optional[Sequence[str]] = None,
     *,
@@ -206,7 +222,7 @@ def login(
             "Alternatively, skip this and use `gcloud auth application-default login`."
         )
 
-    flow = InstalledAppFlow.from_client_secrets_file(secrets, _scopes(scopes))
+    flow = InstalledAppFlow.from_client_config(_load_client_config(secrets), _scopes(scopes))
     creds = flow.run_local_server(port=0, open_browser=not no_browser)
     _save(creds)
     return creds

@@ -38,7 +38,7 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 
 ## Roadmap
 
-**Shipped (v0.3.1):** auth + CLI · schemas, validation & encryption · async CRUD · type-correct server-side query · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · keychain storage.
+**Shipped (v0.3.2):** auth + CLI · schemas, validation & encryption · async CRUD · type-correct server-side query · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · keychain storage.
 
 **Coming next:** MCP server (use your sheets from Claude) · terminal UI · real-time / reactive mode · server-side date filters · one-click hosted sign-in.
 

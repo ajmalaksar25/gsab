@@ -19,7 +19,8 @@ jobs:
         with:
           python-version: "3.x"
       - name: Inject bundled OAuth client (non-confidential Desktop client)
-        run: printf '%s' '${{ secrets.GSAB_OAUTH_CLIENT }}' > src/gsab/auth/client_secret.json
+        # Strip a leading UTF-8 BOM if the secret has one — json.load chokes on it.
+        run: printf '%s' '${{ secrets.GSAB_OAUTH_CLIENT }}' | sed '1s/^\xEF\xBB\xBF//' > src/gsab/auth/client_secret.json
       - name: Build sdist + wheel
         run: pipx run build
       - name: Publish to PyPI

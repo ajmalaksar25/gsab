@@ -3,6 +3,14 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.3.2] — 2026-06-23
+
+### Fixed
+- `gsab auth login` crashed on a fresh install with `JSONDecodeError: Unexpected UTF-8 BOM` when the bundled OAuth client carried a byte-order mark. Client secrets are now read as `utf-8-sig` (BOM-tolerant), and an unreadable/invalid client file raises a friendly `AuthError` instead of a traceback. The publish step strips a BOM and the bundled client ships clean.
+
+### Changed
+- Richer docstrings across the public API so `help(gsab)`, `help(SheetManager)`, `help(Field)` etc. read like standard-library docs — quickstart, Args / Returns / Raises, and the `GSABError` hierarchy.
+
 ## [0.3.1] — 2026-06-23
 
 ### Fixed
