@@ -60,6 +60,8 @@ path = "src/gsab/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gsab"]
+# Ship the bundled Desktop OAuth client (injected at publish time; kept out of VCS).
+artifacts = ["src/gsab/auth/client_secret.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

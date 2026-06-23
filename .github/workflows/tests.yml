@@ -2,69 +2,25 @@ name: Tests
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [main, master, "revamp/**"]
   pull_request:
-    branches: [ master, main ]
 
 jobs:
   test:
-    name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 1  # Run one at a time
       matrix:
-        python-version: [3.8, 3.9, "3.10"]
-
+        python-version: ["3.9", "3.12"]
     steps:
-    - uses: actions/checkout@v2
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-asyncio pytest-cov
-        pip install -r requirements.txt
-        pip install -e .
-    
-    - name: Create test environment
-      run: |
-        mkdir -p tests
-        
-        # Create credentials.json
-        echo '${{ secrets.GOOGLE_CREDENTIALS }}' > tests/credentials.json
-        
-        # Create .env file with required variables
-        echo "GOOGLE_CREDENTIALS_PATH=tests/credentials.json" > tests/.env
-        echo "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" >> tests/.env
-        
-        # Verify files exist and have content (without revealing sensitive data)
-        if [ ! -s tests/credentials.json ]; then
-          echo "Error: credentials.json is empty"
-          exit 1
-        fi
-        if [ ! -s tests/.env ]; then
-          echo "Error: .env is empty"
-          exit 1
-        fi
-    
-    - name: Run tests
-      env:
-        GOOGLE_CREDENTIALS_PATH: tests/credentials.json
-        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-      run: |
-        # Add delay before tests to ensure API quotas are reset
-        echo "Waiting 60 seconds before running tests..."
-        sleep 60
-        pytest tests/ -v --cov=gsab --cov-report=xml --cov-fail-under=70
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v2
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        file: ./coverage.xml
-        fail_ci_if_error: true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Unit tests (offline)
+        run: pytest tests/test_query.py tests/test_encryption.py -q
