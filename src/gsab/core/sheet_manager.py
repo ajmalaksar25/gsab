@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from googleapiclient.discovery import build
@@ -9,6 +10,34 @@ from .schema import Schema
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _match_op(actual: Any, op: str, target: Any) -> bool:
+    """Evaluate a single filter operator against a record value."""
+    try:
+        if op == "$eq":
+            return actual == target
+        if op == "$ne":
+            return actual != target
+        if op == "$gt":
+            return actual is not None and actual > target
+        if op == "$gte":
+            return actual is not None and actual >= target
+        if op == "$lt":
+            return actual is not None and actual < target
+        if op == "$lte":
+            return actual is not None and actual <= target
+        if op == "$in":
+            return actual in target
+        if op == "$nin":
+            return actual not in target
+        if op == "$contains":
+            return str(target) in str(actual)
+        if op == "$regex":
+            return re.search(target, str(actual)) is not None
+    except TypeError:
+        return False
+    raise ValueError(f"Unknown filter operator: {op}")
 
 
 class SheetManager:
@@ -219,25 +248,46 @@ class SheetManager:
             raise
 
     def _matches_filters(self, record: Dict[str, Any], filters: Dict[str, Any]) -> bool:
-        """Check if record matches all filters."""
-        for field, filter_value in filters.items():
-            if field not in record:
-                return False
+        """Check whether a record matches all filters (equality or operator dicts).
 
-            if isinstance(filter_value, dict):
-                # Handle operators like $regex
-                for op, value in filter_value.items():
-                    if op == "$regex":
-                        import re
-
-                        if not re.search(value, str(record[field])):
-                            return False
-            else:
-                # Direct value comparison
-                if record[field] != filter_value:
+        Operators: $eq $ne $gt $gte $lt $lte $in $nin $contains $regex.
+        """
+        for field, cond in filters.items():
+            actual = record.get(field)
+            if isinstance(cond, dict):
+                if not all(_match_op(actual, op, target) for op, target in cond.items()):
                     return False
-
+            elif actual != cond:
+                return False
         return True
+
+    def column(self, field_name: str) -> str:
+        """Return the spreadsheet column letter (A, B, …) for a schema field."""
+        names = [f.name for f in self.schema.fields]
+        if field_name not in names:
+            raise ValueError(f"Unknown field: {field_name}")
+        return chr(ord("A") + names.index(field_name))
+
+    async def query(self, sql: str) -> List[Dict[str, Any]]:
+        """Run a Google Visualization (gviz) query against this tab, server-side.
+
+        Columns are referenced by letter — use ``column()`` to map a field name.
+        Example::
+
+            await db.query("SELECT A, D WHERE D = 'pro' ORDER BY A DESC LIMIT 10")
+
+        Returns a list of dicts keyed by the sheet's header labels. Filtering,
+        sorting and aggregation run on Google's servers, not in Python.
+        """
+        if not self.sheet_id:
+            raise ValueError("Sheet not created")
+        if not self.connection.is_connected():
+            await self.connection.connect()
+        from .query import run_gviz_query
+
+        return run_gviz_query(
+            self.connection.credentials, self.sheet_id, sql, sheet=self.schema.name
+        )
 
     async def update(self, filters: Dict[str, Any], updates: Dict[str, Any]) -> int:
         """Update records matching the filters."""
