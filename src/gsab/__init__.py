@@ -10,7 +10,16 @@ from .auth import login, logout, resolve_credentials, status
 from .core.connection import SheetConnection
 from .core.schema import Field, FieldType, Schema, ValidationRule
 from .core.sheet_manager import SheetManager
-from .exceptions import AuthError, GSABError
+from .exceptions import (
+    APIError,
+    AuthError,
+    ConnectionError,
+    GSABError,
+    NotFoundError,
+    PermissionDeniedError,
+    QuotaExceededError,
+    ValidationError,
+)
 
 __all__ = [
     "SheetConnection",
@@ -25,4 +34,10 @@ __all__ = [
     "status",
     "GSABError",
     "AuthError",
+    "ConnectionError",
+    "NotFoundError",
+    "PermissionDeniedError",
+    "QuotaExceededError",
+    "ValidationError",
+    "APIError",
 ]
