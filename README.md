@@ -1,113 +1,51 @@
-# Google Sheets as Backend (GSAB)
+# GSAB — Google Sheets as a Backend
 
-A Python library that enables using Google Sheets as a database backend with features like schema validation and encryption.
+[![PyPI](https://img.shields.io/pypi/v/gsab.svg)](https://pypi.org/project/gsab/)
+[![Python](https://img.shields.io/pypi/pyversions/gsab.svg)](https://pypi.org/project/gsab/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-1b7a4b.svg)](LICENSE.md)
+[![Tests](https://github.com/ajmalaksar25/gsab/actions/workflows/tests.yml/badge.svg)](https://github.com/ajmalaksar25/gsab/actions/workflows/tests.yml)
+
+A database-like interface for Google Sheets — schemas, validation, field encryption, async CRUD, server-side queries, and a friction-free CLI. **Sign in once; no Google Cloud setup required.**
+
+### 🌐 [gsab.ajmalaksar.com](https://gsab.ajmalaksar.com) &nbsp;·&nbsp; 📖 [Docs](https://gsab.ajmalaksar.com/docs) &nbsp;·&nbsp; 🗺️ [Roadmap](https://gsab.ajmalaksar.com/#roadmap)
+
+## Install
+
+```bash
+pip install gsab          # core
+pip install "gsab[pandas]"  # + DataFrame support
+```
+
+## Get started
+
+```bash
+gsab auth login           # browser sign-in (drive.file scope) — that's the whole setup
+```
+
+Then define a schema and read/write your sheet. **Full usage, examples and the API → [the documentation](https://gsab.ajmalaksar.com/docs).**
 
 ## Features
 
-- 🔒 Secure Google Sheets integration with OAuth2
-- 📊 Schema validation and type checking
-- 🔐 Field-level encryption for sensitive data
-- 🌐 Async/await support
-- 📝 Comprehensive logging
+- **Friction-free auth** — `gsab auth login` opens a browser and uses the minimal `drive.file` scope. No Cloud project, no JSON keys. DIY modes cover existing sheets, your own OAuth client, gcloud, and service accounts.
+- **Schemas & validation** — typed fields, rules and uniqueness, enforced on every write.
+- **Field encryption** — flag a field `encrypted=True` and it's sealed before it reaches the sheet.
+- **Async CRUD + rich filters** — `insert / read / update / delete` with `$gt / $in / $contains / $regex` and more.
+- **Server-side queries** — `query()` runs the Google Visualization query language (filter, sort, aggregate) on Google's side, not in Python.
+- **pandas bridge** — `to_dataframe()` / `from_dataframe()` and `bulk_insert()` for the whole analytics ecosystem.
+- **Secure tokens** — stored in your OS keychain (keyring), with a 0600-file fallback.
 
-## Installation
+## Roadmap
 
-```bash
-pip install gsab
-```
+**Shipped (v0.2.0):** auth + CLI · schemas, validation & encryption · async CRUD · server-side query · pandas bridge + bulk insert · keychain storage.
 
-## Quick Start
+**Coming next:** LLM-friendly errors + retry/backoff · native in-sheet charts + Plotly/Dash helpers · MCP server (use your sheets from Claude) · terminal UI · real-time / reactive mode · one-click hosted sign-in.
 
-1. Set up Google Cloud Project and enable Google Sheets API:
-   - Go to [Google Cloud Console](https://console.cloud.google.com)
-   - Create a new project or select existing one
-   - Enable Google Sheets API
-   - Create OAuth 2.0 credentials
-   - Download credentials JSON file
+Live roadmap → [gsab.ajmalaksar.com/#roadmap](https://gsab.ajmalaksar.com/#roadmap).
 
-2. Set up environment variables:
+## Releases
 
-```bash
-GOOGLE_CREDENTIALS_PATH=/path/to/credentials.json
-ENCRYPTION_KEY=your-encryption-key
-```
-
-3. Basic Usage:
-
-```python
-from gsab import SheetConnection, Schema, Field, FieldType, SheetManager
-
-# Define your schema
-schema = Schema("users", [
-    Field("id", FieldType.INTEGER, required=True, unique=True),
-    Field("email", FieldType.STRING, required=True),
-    Field("password", FieldType.STRING, required=True, encrypted=True)
-])
-
-# Connect and use
-async def main():
-    connection = SheetConnection()
-    await connection.connect()
-    
-    sheet_manager = SheetManager(connection, schema)
-    
-    # Create a new sheet
-    sheet = await sheet_manager.create_sheet("Users Data")
-    
-    # Insert data
-    await sheet_manager.insert({
-        "id": 1,
-        "email": "user@example.com",
-        "password": "secretpass123"  # Will be automatically encrypted
-    })
-
-```
-
-## Schema Definition
-
-Define your data structure with type checking and validation:
-
-```python
-from gsab import Schema, Field, FieldType, ValidationRule
-
-schema = Schema("users", [
-    Field("id", FieldType.INTEGER, required=True, unique=True),
-    Field("email", FieldType.STRING, required=True),
-    Field("age", FieldType.INTEGER, min_value=0, max_value=150),
-    Field("password", FieldType.STRING, required=True, encrypted=True)
-])
-```
-
-## Security Features
-
-### Field Encryption
-
-Sensitive data is automatically encrypted when the field is marked with `encrypted=True`:
-
-```python
-# Fields marked as encrypted will be automatically handled
-schema = Schema("users", [
-    Field("ssn", FieldType.STRING, encrypted=True),
-    Field("credit_card", FieldType.STRING, encrypted=True)
-])
-```
-
-<!-- ## Contributing
-
-We love your input! We want to make contributing to GSheetsDB as easy and transparent as possible, whether it's:
-
-- Reporting a bug
-- Discussing the current state of the code
-- Submitting a fix
-- Proposing new features
-- Becoming a maintainer
-
-Check out our [Contributing Guide](CONTRIBUTING.md) for ways to get started. -->
+Versioned with [SemVer](https://semver.org); see [CHANGELOG.md](CHANGELOG.md). Tagged releases (`vX.Y.Z`) publish to PyPI automatically via GitHub Actions.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
-
-[![PyPI version](https://badge.fury.io/py/gsab.svg)](https://badge.fury.io/py/gsab)
-[![Tests](https://github.com/ajmalaksar25/gsab/actions/workflows/tests.yml/badge.svg)](https://github.com/ajmalaksar25/gsab/actions/workflows/tests.yml)
-[![codecov](https://codecov.io/gh/ajmalaksar25/gsab/branch/main/graph/badge.svg)](https://codecov.io/gh/ajmalaksar25/gsab)
+MIT — see [LICENSE.md](LICENSE.md). GSAB is an independent project, not affiliated with Google LLC.
