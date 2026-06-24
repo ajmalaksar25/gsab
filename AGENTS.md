@@ -49,6 +49,18 @@ notes go in `CLAUDE.LOCAL.md` (untracked; see `.git/info/exclude`).
 - The bundled client must land in **both** sdist and wheel (`[tool.hatch.build].artifacts`),
   because `build` produces the wheel *from* the sdist.
 
+## Roadmap & docs stability
+
+- `ROADMAP.md` is the source of truth for direction and per-feature stability
+  (Stable / Beta / Experimental / Planned / Researching / Out of scope). The site
+  `/#roadmap` is the public summary.
+- **Docs policy:** document a feature on the site/docs when it's **Stable**. If something
+  Beta/Experimental is already shipped, still mention it — clearly labeled, noting the API
+  may change and whether it's rolling out gradually. Never ship a capability silently.
+- Be honest about Google Sheets' limits (no transactions, no SQL joins/FK, no realtime push,
+  rate limits) — document the constraint and the workaround rather than implying parity with
+  Postgres/Supabase.
+
 ## Secrets & ignores
 - Never commit secrets: `client_secret*.json`, `*service-account*.json`, tokens
   (gitignored; GitHub push protection enforces). The public client is non-confidential and

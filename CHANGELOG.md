@@ -3,6 +3,14 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.4.1] — 2026-06-24
+
+### Fixed
+- Attaching to an existing spreadsheet (`db.sheet_id = ...` without `create_sheet`) — and using **multiple independent connections to the same sheet** — now works: `read`, `insert`/`bulk_insert`, `update`, `delete`, `rename_sheet` and `delete_sheet` connect lazily on first use instead of raising `AttributeError: 'NoneType' object has no attribute 'spreadsheets'`.
+
+### Added
+- `ROADMAP.md` — direction + per-feature stability (Stable / Beta / Experimental / Planned / Researching), the docs-stability policy, and a verified concurrency/consistency model (parallel writes don't get lost; updates are last-write-wins; no transactions).
+
 ## [0.4.0] — 2026-06-24
 
 Get productive faster, and let coding agents use GSAB.

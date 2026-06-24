@@ -43,7 +43,7 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 
 **Coming next:** MCP server (use your sheets from Claude) · terminal UI · real-time / reactive mode · server-side date filters · one-click hosted sign-in.
 
-Live roadmap → [gsab.ajmalaksar.com/#roadmap](https://gsab.ajmalaksar.com/#roadmap).
+Full roadmap with per-feature stability (and what's deliberately out of scope) → [ROADMAP.md](ROADMAP.md). Live summary → [gsab.ajmalaksar.com/#roadmap](https://gsab.ajmalaksar.com/#roadmap).
 
 ## Releases
 

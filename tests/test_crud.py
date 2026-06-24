@@ -53,7 +53,7 @@ class _Service:
 
 
 class FakeConnection:
-    def __init__(self, grid, *, col_a=None, batch_reply=None, tab="t", sheet_id=7):
+    def __init__(self, grid, *, col_a=None, batch_reply=None, tab="t", sheet_id=7, connected=True):
         self.grid = grid
         self.col_a = col_a or [[r[0]] for r in grid]
         self.metadata = {"sheets": [{"properties": {"title": tab, "sheetId": sheet_id}}]}
@@ -61,12 +61,15 @@ class FakeConnection:
         self.batched = []
         self.credentials = None
         self.service = _Service(self)
+        self.connected = connected
+        self.connect_calls = 0
 
     def is_connected(self):
-        return True
+        return self.connected
 
     async def connect(self):
-        return None
+        self.connected = True
+        self.connect_calls += 1
 
 
 def _schema():
@@ -145,6 +148,17 @@ async def test_op_before_sheet_bound_raises():
     db = SheetManager(FakeConnection([["id", "age"]]), _schema())
     with pytest.raises(Exception):
         await db.read()
+
+
+async def test_read_connects_lazily_when_attached_to_existing_sheet():
+    # Attaching to an existing sheet (set sheet_id, no create_sheet) must still
+    # connect on first use — multi-connection / existing-sheet pattern.
+    conn = FakeConnection([["id", "age"], ["1", "20"]], connected=False)
+    db = SheetManager(conn, _schema())
+    db.sheet_id = "SHEET"
+    rows = await db.read()
+    assert conn.connect_calls == 1
+    assert rows == [{"id": 1, "age": 20}]
 
 
 async def test_read_strips_internal_row_index():

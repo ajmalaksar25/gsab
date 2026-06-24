@@ -203,6 +203,7 @@ class SheetManager:
     async def bulk_insert(self, records: List[Dict[str, Any]]) -> int:
         """Insert many records in a single append call. Returns the number inserted."""
         self._require_sheet()
+        await self._ensure_connected()
         rows = [self._encode_row(r) for r in records]
         if not rows:
             return 0
@@ -277,6 +278,7 @@ class SheetManager:
         """Like :meth:`read`, but each record carries ``_row_index`` (its 0-based sheet
         row) for the update/delete machinery. Internal — public ``read`` strips it."""
         self._require_sheet()
+        await self._ensure_connected()
         result = await execute(
             self.connection.service.spreadsheets()
             .values()
@@ -572,6 +574,7 @@ class SheetManager:
     async def rename_sheet(self, new_title: str) -> None:
         """Rename the spreadsheet."""
         self._require_sheet()
+        await self._ensure_connected()
         request = {
             "updateSpreadsheetProperties": {
                 "properties": {"title": new_title},
@@ -589,6 +592,7 @@ class SheetManager:
     async def delete_sheet(self) -> None:
         """Delete the entire spreadsheet via the Drive API (falls back to clearing rows)."""
         self._require_sheet()
+        await self._ensure_connected()
         drive_service = build("drive", "v3", credentials=self.connection.credentials)
         try:
             await execute(
