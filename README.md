@@ -20,9 +20,11 @@ pip install "gsab[pandas]"  # + DataFrame support
 
 ```bash
 gsab auth login           # browser sign-in (drive.file scope) — that's the whole setup
+gsab init my-app          # scaffold a runnable starter (add --fastapi for a CRUD API)
+gsab doctor --live        # prove it works end to end
 ```
 
-Then define a schema and read/write your sheet. **Full usage, examples and the API → [the documentation](https://gsab.ajmalaksar.com/docs).**
+Then define a schema and read/write your sheet. **Full usage, examples and the API → [the documentation](https://gsab.ajmalaksar.com/docs).** `gsab import data.csv` loads a CSV, and `gsab cookbook list` shows ready recipes.
 
 ## Features
 
@@ -39,7 +41,7 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 
 ## Roadmap
 
-**Shipped (v0.4.0):** auth + CLI · schemas, validation & encryption · async CRUD · type-correct server-side query · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · keychain storage.
+**Shipped (v0.5.0):** auth + CLI · schemas, validation & encryption · async CRUD · type-correct server-side query · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import (`gsab init` / `import` / `doctor` / `cookbook`) · keychain storage.
 
 **Coming next:** MCP server (use your sheets from Claude) · terminal UI · real-time / reactive mode · server-side date filters · one-click hosted sign-in.
 

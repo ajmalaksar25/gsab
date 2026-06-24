@@ -3,6 +3,16 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.5.0] — 2026-06-24
+
+Get productive in a minute, not an afternoon.
+
+### Added
+- `gsab doctor [--live]` — check your setup (auth, OAuth client, pandas); with `--live`, a real create → write → read → query → delete round-trip that cleans up after itself.
+- `gsab init [PATH] [--fastapi]` — scaffold a runnable starter (`schema.py`, `app.py`, `README.md`); `--fastapi` adds a FastAPI CRUD service (`api.py`). Won't clobber existing files.
+- `gsab import <CSV> [--title]` — infer a schema from a CSV and load it into a new sheet (needs the `pandas` extra).
+- `gsab cookbook list | show <name> [--out]` — ready-to-run recipes (CSV import, server-side query, charts, encryption).
+
 ## [0.4.1] — 2026-06-24
 
 ### Fixed

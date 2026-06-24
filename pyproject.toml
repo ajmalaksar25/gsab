@@ -76,6 +76,8 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+# Scaffolding templates & recipes are user-facing examples, not library code.
+extend-exclude = ["src/gsab/templates", "src/gsab/cookbook"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]
