@@ -43,9 +43,9 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 
 ## Roadmap
 
-**Shipped (v0.7.0):** auth + CLI · schemas, validation & encryption · async CRUD · upsert + enforced primary keys · type-correct server-side query · **reactive `watch()` (Experimental)** · one-call public sharing · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import (`gsab init` / `import` / `doctor` / `cookbook`) · keychain storage.
+**Shipped (v0.7.1):** auth + CLI · schemas, validation & encryption · async CRUD · upsert + enforced primary keys · type-correct server-side query · **reactive `watch()` (Experimental)** · one-call public sharing · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import (`gsab init` / `import` / `doctor` / `cookbook`) · keychain storage.
 
-**Coming next:** auto update-available notice · rate-aware batching · MCP server (use your sheets from Claude) · improved/pipe-friendly CLI · a JavaScript client · terminal UI · one-click hosted sign-in.
+**Coming next:** rate-aware batching · MCP server (use your sheets from Claude) · improved/pipe-friendly CLI · a JavaScript client · terminal UI · one-click hosted sign-in.
 
 Full roadmap with per-feature stability (and what's deliberately out of scope) → [ROADMAP.md](ROADMAP.md). Live summary → [gsab.ajmalaksar.com/#roadmap](https://gsab.ajmalaksar.com/#roadmap).
 

@@ -26,4 +26,4 @@ jobs:
         run: |
           pytest tests/test_query.py tests/test_encryption.py tests/test_crud.py \
             tests/test_errors.py tests/test_cli.py tests/test_client_config.py \
-            tests/test_auth.py -q
+            tests/test_auth.py tests/test_update_check.py -q

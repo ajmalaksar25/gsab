@@ -75,7 +75,14 @@ _KEYRING_USER = "oauth-token"
 
 
 def _keyring():
-    """Return a usable keyring backend (OS keychain), or None to fall back to a file."""
+    """Return a usable keyring backend (OS keychain), or None to fall back to a file.
+
+    Set ``GSAB_NO_KEYRING=1`` to skip the OS keychain entirely and use the 0600 token
+    file. This avoids macOS Keychain re-prompting for the password on every command
+    (the prompt fires when the invoking binary isn't in the keychain item's ACL).
+    """
+    if os.getenv("GSAB_NO_KEYRING") not in (None, "", "0"):
+        return None
     try:
         import keyring
         from keyring.backends.fail import Keyring as FailKeyring

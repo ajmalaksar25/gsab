@@ -3,6 +3,12 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.7.1] — 2026-06-26
+
+### Added
+- **Update notice** — the CLI now tells you when you're behind. It checks PyPI at most once a day (cached in the config dir, non-blocking with a short timeout, and it never breaks a command), then prints a one-line *"a new gsab is available — pip install -U gsab"* to stderr. Opt out with `GSAB_NO_UPDATE_CHECK=1`.
+- **`GSAB_NO_KEYRING=1`** — skip the OS keychain and store the token in the 0600 file instead. This fixes **macOS Keychain re-prompting for your password on every command** (the prompt fires when the invoking binary isn't in the keychain item's ACL — common for a CLI). A smoother default for Mac users who hit the prompt loop.
+
 ## [0.7.0] — 2026-06-25
 
 Reactive reads — your sheet, live. *(Experimental)*

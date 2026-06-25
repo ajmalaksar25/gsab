@@ -32,6 +32,15 @@ auth_app = typer.Typer(help="Sign in and manage Google credentials.", no_args_is
 app.add_typer(auth_app, name="auth")
 
 
+@app.callback()
+def _root() -> None:
+    """Google Sheets as a Backend - auth and manage your sheets from the terminal."""
+    # Quiet, cached (once/day), opt-out-able "a newer gsab is available" notice → stderr.
+    from ..utils.update_check import notify_if_outdated
+
+    notify_if_outdated()
+
+
 @app.command()
 def version() -> None:
     """Show the GSAB version."""
