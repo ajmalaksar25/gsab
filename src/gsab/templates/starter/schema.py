@@ -8,9 +8,9 @@ from gsab import Field, FieldType, Schema
 users = Schema(
     "users",
     [
-        Field("id", FieldType.INTEGER, required=True, unique=True),
+        Field("id", FieldType.INTEGER, primary_key=True),  # enforced unique key
         Field("name", FieldType.STRING, required=True, max_length=80),
         Field("email", FieldType.STRING, pattern=r"[^@]+@[^@]+\.[^@]+"),
-        Field("plan", FieldType.STRING, default="free"),
+        Field("plan", FieldType.STRING, default="free"),  # default => optional
     ],
 )

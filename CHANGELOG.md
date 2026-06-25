@@ -3,6 +3,30 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.6.0] — 2026-06-24
+
+Primary keys and idempotent writes — make a sheet behave like a keyed table.
+
+### Added
+- **One-call public sharing**: `await db.share()` makes the spreadsheet readable by anyone with the link and returns its URL; `await db.unshare()` revokes it; `db.csv_url` is the CSV-export URL (publicly fetchable once shared — e.g. `pandas.read_csv(db.csv_url)`). Works on the default non-sensitive `drive.file` scope, because GSAB owns the sheets it creates. (Revocation is immediate at the permission level; Google's public export cache can lag briefly.)
+- **`Field(..., primary_key=True)`** — declares a table's key (implies `required` + `unique`; at most one per schema). It's the default key `upsert()` matches on.
+- **`upsert(data, *, key=None)`** — insert, or update the row whose key matches; returns `"inserted"` or `"updated"`. Omitted fields keep their current value. Defaults to the schema's primary key; pass `key="field"` to match another column.
+- **`bulk_upsert(records, *, key=None)`** — batch insert-or-update in one append + one batched update; last entry wins per key. Returns `{"inserted": n, "updated": m}`.
+- **`DuplicateKeyError`** — raised when an `insert`/`bulk_insert` would create a duplicate `unique`/`primary_key` value (existing rows or within the same batch). Exported from `gsab`.
+- `gsab cookbook show upsert` recipe; the FastAPI skill gains an idempotent `PUT` and maps `DuplicateKeyError` → HTTP 409.
+
+### Changed
+- **`unique=True` is now enforced, not advisory.** Inserting a duplicate value into a `unique`/`primary_key` field raises `DuplicateKeyError` instead of silently creating a second row. The check is a read-check-write (Google Sheets has no conditional write), so two clients inserting the *same new key* concurrently can still both land — `upsert()` closes the single-client idempotency gap; the race window is documented. Schemas with **no** unique field keep the old read-free fast append.
+
+### Fixed
+- **Field constraints are now actually enforced on writes.** `min_value` / `max_value`, `min_length` / `max_length` and custom `validation_rules` were silently ignored — `validate()` only checked the field type (plus a stray hardcoded `name == "age"` rule). They are now all enforced on every `insert` / `upsert`, as the docs always claimed, and the `age` special-case is gone (use `min_value=0`).
+- **A field with a `default` is now optional.** Previously a `Field` with a `default` but `required=True` (the implicit default) was still rejected when omitted, so the `default` never applied on insert — and the 0.5.0 starter template crashed on its second insert because of it. `validate()` now treats a non-None `default` as satisfying the required check, library-wide. The starter template also demonstrates `upsert()`.
+- **`FieldType.JSON` fields now round-trip as objects.** A JSON field is serialized to a JSON string on write and parsed back to the original `dict`/`list` on read; previously it fell through to `str()` and came back as an un-parseable Python-repr string.
+- **The legacy `AuthenticationError` now subclasses `AuthError`** (and thus `GSABError`), so `except AuthError` / `except GSABError` catch it like every other GSAB error — it was the one exception escaping the hierarchy.
+
+### Removed
+- **The unfinished `gsab.web` FastAPI dashboard** and its `server` extra. It was shipped but undocumented, half-wired, and used the obsolete service-account-path auth model; the maintained way to build a web API on GSAB is the `gsab-fastapi` skill (`gsab skill install`). Also dropped the empty `tui` and `mcp` extras — they pulled dependencies but shipped no implementation; they'll return when those features land.
+
 ## [0.5.0] — 2026-06-24
 
 Get productive in a minute, not an afternoon.

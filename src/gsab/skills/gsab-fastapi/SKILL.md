@@ -29,13 +29,13 @@ from pydantic import BaseModel
 
 from gsab import (
     SheetConnection, SheetManager, Schema, Field, FieldType,
-    GSABError, NotFoundError, ValidationError, AuthError,
+    GSABError, NotFoundError, ValidationError, DuplicateKeyError, AuthError,
 )
 
 schema = Schema("users", [
-    Field("id",   FieldType.INTEGER, required=True, unique=True),
+    Field("id",   FieldType.INTEGER, primary_key=True),          # enforced unique key
     Field("name", FieldType.STRING,  required=True, max_length=80),
-    Field("plan", FieldType.STRING,  default="free"),
+    Field("plan", FieldType.STRING,  default="free"),            # default => optional
 ])
 
 db = SheetManager(SheetConnection(), schema)
@@ -60,8 +60,14 @@ class UserPatch(BaseModel):
 
 @app.post("/users", status_code=201)
 async def create_user(user: UserIn):
-    await db.insert(user.model_dump())
+    await db.insert(user.model_dump())   # duplicate id -> DuplicateKeyError -> 409
     return user
+
+@app.put("/users/{user_id}")
+async def put_user(user_id: int, user: UserIn):
+    # Idempotent create-or-replace, keyed on the primary key.
+    status = await db.upsert({**user.model_dump(), "id": user_id})
+    return {"result": status}
 
 @app.get("/users")
 async def list_users(plan: str | None = None):
@@ -98,7 +104,7 @@ Add one exception handler so library errors become clean responses:
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-STATUS = {ValidationError: 422, NotFoundError: 404, AuthError: 401}
+STATUS = {DuplicateKeyError: 409, ValidationError: 422, NotFoundError: 404, AuthError: 401}
 
 @app.exception_handler(GSABError)
 async def gsab_error_handler(request: Request, exc: GSABError):

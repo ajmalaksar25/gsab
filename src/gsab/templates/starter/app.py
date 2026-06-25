@@ -19,6 +19,10 @@ async def main():
     await db.insert({"id": 1, "name": "Ada Lovelace", "email": "ada@calc.org", "plan": "pro"})
     await db.insert({"id": 2, "name": "Alan Turing", "email": "alan@enigma.io"})
 
+    # upsert = insert-or-update on the primary key (id). Safe to re-run; here it
+    # upgrades Alan (id=2) to pro without duplicating the row.
+    print("Upsert:", await db.upsert({"id": 2, "plan": "pro"}))  # -> "updated"
+
     print("Pro users (read):", await db.read({"plan": "pro"}))
     print("Server-side query:", await db.query("SELECT A, B WHERE D = 'pro'"))
 

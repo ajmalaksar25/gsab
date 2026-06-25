@@ -28,6 +28,10 @@ class _Values:
         rows = self.conn.col_a if range.endswith("!A:A") else self.conn.grid
         return _Request({"values": rows})
 
+    def append(self, *, spreadsheetId, range, valueInputOption, body):
+        self.conn.appended.append(body["values"])
+        return _Request({})
+
 
 class _Spreadsheets:
     def __init__(self, conn):
@@ -59,6 +63,7 @@ class FakeConnection:
         self.metadata = {"sheets": [{"properties": {"title": tab, "sheetId": sheet_id}}]}
         self.batch_reply = batch_reply or {}
         self.batched = []
+        self.appended = []
         self.credentials = None
         self.service = _Service(self)
         self.connected = connected
@@ -168,6 +173,284 @@ async def test_read_strips_internal_row_index():
     rows = await db.read()
     assert rows == [{"id": 1, "age": 20}, {"id": 2, "age": 30}]  # clean, schema-typed
     assert all("_row_index" not in r for r in rows)
+
+
+def _pk_schema():
+    return Schema(
+        "t",
+        [
+            Field("id", FieldType.INTEGER, primary_key=True),
+            Field("age", FieldType.INTEGER, required=True),
+        ],
+    )
+
+
+async def test_primary_key_implies_required_and_unique():
+    schema = _pk_schema()
+    pk = schema.get_field("id")
+    assert pk.required and pk.unique
+    assert schema.primary_key == "id"
+    assert [f.name for f in schema.unique_fields] == ["id"]
+
+
+def test_schema_rejects_two_primary_keys():
+    with pytest.raises(ValueError) as exc:
+        Schema(
+            "t",
+            [
+                Field("a", FieldType.INTEGER, primary_key=True),
+                Field("b", FieldType.INTEGER, primary_key=True),
+            ],
+        )
+    assert "at most one primary_key" in str(exc.value)
+
+
+async def test_insert_rejects_duplicate_primary_key():
+    from gsab.exceptions.custom_exceptions import DuplicateKeyError
+
+    conn = FakeConnection([["id", "age"], ["1", "20"]])
+    db = SheetManager(conn, _pk_schema())
+    db.sheet_id = "SHEET"
+    with pytest.raises(DuplicateKeyError) as exc:
+        await db.insert({"id": 1, "age": 99})
+    assert "id" in str(exc.value)
+    assert conn.appended == []  # nothing written
+
+
+async def test_bulk_insert_rejects_within_batch_duplicate():
+    from gsab.exceptions.custom_exceptions import DuplicateKeyError
+
+    conn = FakeConnection([["id", "age"]])  # empty (header only)
+    db = SheetManager(conn, _pk_schema())
+    db.sheet_id = "SHEET"
+    with pytest.raises(DuplicateKeyError):
+        await db.bulk_insert([{"id": 5, "age": 10}, {"id": 5, "age": 20}])
+    assert conn.appended == []
+
+
+async def test_insert_allows_new_key():
+    conn = FakeConnection([["id", "age"], ["1", "20"]])
+    db = SheetManager(conn, _pk_schema())
+    db.sheet_id = "SHEET"
+    await db.insert({"id": 2, "age": 30})
+    assert conn.appended == [[[2, 30]]]  # typed cells, single append
+
+
+async def test_upsert_inserts_when_key_absent():
+    conn = FakeConnection([["id", "age"], ["1", "20"]])
+    db = SheetManager(conn, _pk_schema())
+    db.sheet_id = "SHEET"
+    status = await db.upsert({"id": 9, "age": 40})
+    assert status == "inserted"
+    assert conn.appended == [[[9, 40]]]
+    assert conn.batched == []  # no update path
+
+
+async def test_upsert_updates_existing_row_and_merges():
+    conn = FakeConnection([["id", "age"], ["1", "20"], ["2", "30"]])
+    db = SheetManager(conn, _pk_schema())
+    db.sheet_id = "SHEET"
+    status = await db.upsert({"id": 2, "age": 99})
+    assert status == "updated"
+    assert conn.appended == []  # nothing inserted
+    req = conn.batched[0]["requests"][0]["updateCells"]
+    assert (req["range"]["startRowIndex"], req["range"]["endRowIndex"]) == (2, 3)  # id=2 row
+    written = [c["userEnteredValue"] for c in req["rows"][0]["values"]]
+    assert written == [{"numberValue": 2}, {"numberValue": 99}]
+
+
+async def test_bulk_upsert_counts_and_last_write_wins():
+    conn = FakeConnection([["id", "age"], ["1", "20"]])
+    db = SheetManager(conn, _pk_schema())
+    db.sheet_id = "SHEET"
+    # id=1 exists (update); id=7 twice in batch (insert once, last wins).
+    result = await db.bulk_upsert(
+        [{"id": 1, "age": 21}, {"id": 7, "age": 70}, {"id": 7, "age": 77}]
+    )
+    assert result == {"inserted": 1, "updated": 1}
+    assert conn.appended == [[[7, 77]]]  # last value wins, one row
+
+
+async def test_upsert_without_key_raises():
+    conn = FakeConnection([["id", "age"], ["1", "20"]])
+    db = SheetManager(conn, _schema())  # no primary key
+    db.sheet_id = "SHEET"
+    with pytest.raises(Exception) as exc:
+        await db.upsert({"id": 1, "age": 5})
+    assert "key" in str(exc.value).lower()
+
+
+def test_field_constraints_are_enforced_on_write():
+    from gsab.core.schema import ValidationRule
+
+    s = Schema(
+        "t",
+        [
+            Field("id", FieldType.INTEGER, primary_key=True),
+            Field("age", FieldType.INTEGER, min_value=0, max_value=150),
+            Field("score", FieldType.INTEGER, min_value=0),  # not named "age"
+            Field("name", FieldType.STRING, min_length=2, max_length=5),
+            Field("email", FieldType.STRING, pattern=r"[^@]+@[^@]+\.[^@]+"),
+            Field(
+                "rank",
+                FieldType.INTEGER,
+                validation_rules=[ValidationRule(lambda x: x % 2 == 0, "rank must be even")],
+            ),
+        ],
+    )
+    ok = {"id": 1, "age": 30, "score": 1, "name": "ok", "email": "a@b.io", "rank": 2}
+    assert s.validate(ok) == []
+    assert s.validate({**ok, "age": 200})  # max_value enforced
+    assert s.validate({**ok, "score": -5})  # min_value enforced on a non-"age" field
+    assert s.validate({**ok, "name": "toolong"})  # max_length enforced
+    assert s.validate({**ok, "name": "x"})  # min_length enforced
+    assert s.validate({**ok, "email": "nope"})  # pattern enforced
+    assert s.validate({**ok, "rank": 3})  # custom rule enforced
+    assert s.validate({**ok, "age": True})  # bool rejected for INTEGER
+
+
+def test_field_with_default_is_optional():
+    schema = Schema(
+        "t",
+        [
+            Field("id", FieldType.INTEGER, primary_key=True),
+            Field("plan", FieldType.STRING, default="free"),  # required defaults True
+        ],
+    )
+    # Omitting a field that has a default is fine; omitting a plain required field is not.
+    assert schema.validate({"id": 1}) == []
+    assert schema.validate({"plan": "pro"}) == ["Field id is required"]
+
+
+async def test_insert_applies_default_when_field_omitted():
+    schema = Schema(
+        "t",
+        [
+            Field("id", FieldType.INTEGER, primary_key=True),
+            Field("plan", FieldType.STRING, default="free"),
+        ],
+    )
+    conn = FakeConnection([["id", "plan"]])
+    db = SheetManager(conn, schema)
+    db.sheet_id = "SHEET"
+    await db.insert({"id": 1})  # plan omitted -> default
+    assert conn.appended == [[[1, "free"]]]
+
+
+async def test_upsert_on_explicit_key_field():
+    # No PK declared, but match on an explicit key column.
+    conn = FakeConnection([["id", "age"], ["1", "20"]])
+    db = SheetManager(conn, _schema())
+    db.sheet_id = "SHEET"
+    status = await db.upsert({"id": 1, "age": 50}, key="id")
+    assert status == "updated"
+
+
+async def test_json_field_round_trips_through_object():
+    schema = Schema(
+        "t",
+        [
+            Field("id", FieldType.INTEGER, primary_key=True),
+            Field("meta", FieldType.JSON),
+        ],
+    )
+    conn = FakeConnection([["id", "meta"]])
+    db = SheetManager(conn, schema)
+    db.sheet_id = "SHEET"
+    await db.insert({"id": 1, "meta": {"a": 1, "b": [2, 3]}})
+    stored = conn.appended[0][0][1]
+    assert stored == '{"a": 1, "b": [2, 3]}'  # serialized JSON string at rest
+    # Read it back — the stored string is parsed back into the original object.
+    conn.grid = [["id", "meta"], ["1", stored]]
+    conn.col_a = [["id"], ["1"]]
+    rows = await db.read()
+    assert rows == [{"id": 1, "meta": {"a": 1, "b": [2, 3]}}]
+
+
+async def test_encryption_round_trips_through_sheet_manager():
+    from cryptography.fernet import Fernet
+
+    from gsab.utils.encryption import Encryptor
+
+    key = Fernet.generate_key().decode()
+    schema = Schema(
+        "t",
+        [
+            Field("id", FieldType.INTEGER, primary_key=True),
+            Field("secret", FieldType.STRING, encrypted=True),
+        ],
+    )
+    conn = FakeConnection([["id", "secret"]])
+    db = SheetManager(conn, schema, encryption_key=key)
+    db.sheet_id = "SHEET"
+    await db.insert({"id": 1, "secret": "hunter2"})
+    stored = conn.appended[0][0][1]
+    assert stored != "hunter2"  # encrypted at rest, not plaintext
+    assert Encryptor(key).decrypt(stored) == "hunter2"
+    # read() decrypts transparently.
+    conn.grid = [["id", "secret"], ["1", stored]]
+    conn.col_a = [["id"], ["1"]]
+    rows = await db.read()
+    assert rows == [{"id": 1, "secret": "hunter2"}]
+
+
+async def test_upsert_race_window_both_insert_on_stale_read():
+    # Pins the DOCUMENTED read-check-write race: two upserts that read the same
+    # pre-insert state both append, because Sheets has no conditional write. Not
+    # desired behaviour — this guards against ever implying upsert is atomic.
+    conn = FakeConnection([["id", "age"]])  # the fake grid does not grow on append
+    db = SheetManager(conn, _pk_schema())
+    db.sheet_id = "SHEET"
+    assert await db.upsert({"id": 1, "age": 10}) == "inserted"
+    assert await db.upsert({"id": 1, "age": 20}) == "inserted"  # stale read → also inserts
+    assert len(conn.appended) == 2
+
+
+def test_csv_url_points_at_export_endpoint():
+    db = SheetManager(FakeConnection([["id", "age"]]), _schema())
+    db.sheet_id = "SHEET123"
+    assert db.csv_url == "https://docs.google.com/spreadsheets/d/SHEET123/export?format=csv"
+
+
+async def test_share_rejects_bad_role():
+    db = SheetManager(FakeConnection([["id", "age"]]), _schema())
+    db.sheet_id = "SHEET"
+    with pytest.raises(Exception) as exc:
+        await db.share(role="owner")
+    assert "reader" in str(exc.value)
+
+
+async def test_share_and_unshare_drive_permissions(monkeypatch):
+    calls = {}
+
+    class _FakeDrive:
+        def permissions(self):
+            return self
+
+        def files(self):
+            return self
+
+        def create(self, *, fileId, body, fields):
+            calls["create"] = body
+            return _Request({"id": "anyoneWithLink"})
+
+        def get(self, *, fileId, fields):
+            return _Request({"webViewLink": "https://docs.google.com/spreadsheets/d/SHEET/edit"})
+
+        def delete(self, *, fileId, permissionId):
+            calls["delete"] = permissionId
+            return _Request({})
+
+    db = SheetManager(FakeConnection([["id", "age"]]), _schema())
+    db.sheet_id = "SHEET"
+    monkeypatch.setattr(db, "_drive", lambda: _FakeDrive())
+
+    url = await db.share()
+    assert calls["create"] == {"type": "anyone", "role": "reader"}
+    assert url == "https://docs.google.com/spreadsheets/d/SHEET/edit"
+
+    await db.unshare()
+    assert calls["delete"] == "anyoneWithLink"
 
 
 async def test_query_coerces_field_columns_to_schema_types(monkeypatch):

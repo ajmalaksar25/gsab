@@ -11,6 +11,14 @@ from gsab.core.sheet_manager import SheetManager
 # Load environment variables
 load_dotenv()
 
+# These are LIVE integration tests: they create/mutate/delete real Google Sheets via
+# the developer's cached credentials. Skip them unless explicitly opted in, so a bare
+# `pytest` never touches a real account. (CI runs the offline suite only.)
+pytestmark = pytest.mark.skipif(
+    os.getenv("GSAB_RUN_LIVE_TESTS") != "1",
+    reason="live test — set GSAB_RUN_LIVE_TESTS=1 to run against a real Google account",
+)
+
 
 @pytest.fixture
 def encryption_key():

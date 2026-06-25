@@ -29,21 +29,22 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 ## Features
 
 - **Friction-free auth** — `gsab auth login` opens a browser and uses the minimal `drive.file` scope. No Cloud project, no JSON keys. DIY modes cover existing sheets, your own OAuth client, gcloud, and service accounts.
-- **Schemas & validation** — typed fields, rules and uniqueness, enforced on every write.
+- **Schemas, keys & validation** — typed fields, validation rules, and enforced `primary_key` / `unique` columns checked on every write.
 - **Field encryption** — flag a field `encrypted=True` and it's sealed before it reaches the sheet.
-- **Async CRUD + rich filters** — `insert / read / update / delete` with `$gt / $in / $contains / $regex` and more.
+- **Async CRUD + upsert** — `insert / read / update / delete` plus `upsert()` for idempotent insert-or-update on a primary key, with rich filters (`$gt / $in / $contains / $regex` and more).
 - **Server-side queries** — `query()` runs the Google Visualization query language (filter, sort, aggregate) on Google's side, not in Python. Values come back type-correct.
 - **pandas bridge** — `to_dataframe()` / `from_dataframe()` and `bulk_insert()` for the whole analytics ecosystem.
 - **Native charts** — `chart()` embeds a Google chart in the sheet; or hand `to_dataframe()` to matplotlib/Plotly.
+- **One-call public sharing** — `share()` publishes a created sheet to a read-only public link (and `csv_url` for embedding); `unshare()` revokes. No extra scope — GSAB owns the sheets it makes.
 - **Actionable errors** — Google API errors become clear GSAB exceptions with retry/backoff and token refresh — readable by humans and LLM agents.
 - **Installable agent skills** — `gsab skill install` drops GSAB skills into `.claude/skills` (or `--portable` for any LLM) so your coding agent knows the real API.
 - **Secure tokens** — stored in your OS keychain (keyring), with a 0600-file fallback.
 
 ## Roadmap
 
-**Shipped (v0.5.0):** auth + CLI · schemas, validation & encryption · async CRUD · type-correct server-side query · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import (`gsab init` / `import` / `doctor` / `cookbook`) · keychain storage.
+**Shipped (v0.6.0):** auth + CLI · schemas, validation & encryption · async CRUD · **upsert + enforced primary keys** · type-correct server-side query · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import (`gsab init` / `import` / `doctor` / `cookbook`) · keychain storage.
 
-**Coming next:** MCP server (use your sheets from Claude) · terminal UI · real-time / reactive mode · server-side date filters · one-click hosted sign-in.
+**Coming next:** real-time / reactive mode (polling) · rate-aware batching · MCP server (use your sheets from Claude) · terminal UI · server-side date filters · one-click hosted sign-in.
 
 Full roadmap with per-feature stability (and what's deliberately out of scope) → [ROADMAP.md](ROADMAP.md). Live summary → [gsab.ajmalaksar.com/#roadmap](https://gsab.ajmalaksar.com/#roadmap).
 

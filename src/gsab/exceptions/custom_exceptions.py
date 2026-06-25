@@ -41,6 +41,16 @@ class ValidationError(GSABError, ValueError):
     """
 
 
+class DuplicateKeyError(GSABError):
+    """A write would create a duplicate value in a `unique` / `primary_key` field.
+
+    Raised by `insert`/`bulk_insert` when a row's key already exists (or repeats
+    within the batch). Use `upsert()` to insert-or-update instead, or change the
+    value. The check is a read-check-write, so two concurrent inserts of the same
+    new key can still both land.
+    """
+
+
 class EncryptionError(GSABError):
     """An encryption or decryption operation failed."""
 

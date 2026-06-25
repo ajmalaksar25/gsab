@@ -1,6 +1,16 @@
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 
+from ..exceptions.custom_exceptions import AuthError
+
+
+class AuthenticationError(AuthError):
+    """Authentication failed (legacy service-account path).
+
+    Subclasses ``AuthError`` (and thus ``GSABError``), so ``except AuthError`` /
+    ``except GSABError`` catch it like every other GSAB error.
+    """
+
 
 class GoogleAuthenticator:
     """Handles authentication with Google Sheets API."""
@@ -33,9 +43,3 @@ class GoogleAuthenticator:
             return self.creds
         except Exception as e:
             raise AuthenticationError(f"Authentication failed: {str(e)}") from e
-
-
-class AuthenticationError(Exception):
-    """Custom exception for authentication errors."""
-
-    pass

@@ -30,15 +30,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-server = [
-    "fastapi>=0.68.0",
-    "uvicorn>=0.15.0",
-    "python-multipart>=0.0.5",
-    "jinja2>=3.0.0",
-    "aiofiles>=0.8.0",
-]
-tui = ["textual>=0.50.0"]
-mcp = ["mcp>=1.0.0"]
+# `tui`, `mcp` and a FastAPI `server` are on the roadmap — their extras will be added
+# back when the features ship, rather than advertising installable-but-empty extras.
 pandas = ["pandas>=2.0"]
 dev = [
     "pytest>=7.0.0",

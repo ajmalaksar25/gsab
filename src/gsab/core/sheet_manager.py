@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from datetime import date, datetime
@@ -5,11 +6,11 @@ from typing import Any, Dict, List, Optional, Union
 
 from googleapiclient.discovery import build
 
-from ..exceptions.custom_exceptions import NotFoundError, ValidationError
+from ..exceptions.custom_exceptions import DuplicateKeyError, NotFoundError, ValidationError
 from ..utils.encryption import Encryptor
 from ..utils.errors import execute
 from .connection import SheetConnection
-from .schema import Schema
+from .schema import FieldType, Schema
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -64,10 +65,11 @@ class SheetManager:
     """Async CRUD over one Google Sheet tab, driven by a `Schema`.
 
     Binds a `SheetConnection` to a `Schema` (one tab = one table) and exposes
-    create / insert / read / update / delete, server-side `query()`, the pandas
-    bridge (`to_dataframe()` / `from_dataframe()`) and native `chart()`.
+    create / insert / read / update / delete / `upsert()`, server-side `query()`,
+    the pandas bridge (`to_dataframe()` / `from_dataframe()`) and native `chart()`.
     Validation runs on every write; fields flagged `encrypted=True` are sealed
-    before they reach the sheet and decrypted on read.
+    before they reach the sheet and decrypted on read. A `unique`/`primary_key`
+    field is enforced on insert/upsert (read-check-write; `DuplicateKeyError`).
 
     Args:
         connection: a `SheetConnection` (connected lazily on first use).
@@ -153,6 +155,9 @@ class SheetManager:
         if value is None or value == "":
             return ""
         value = self.schema._convert_value(value, field.field_type)
+        if field.field_type == FieldType.JSON:
+            # Store JSON as a serialized string (so it round-trips back to an object).
+            value = json.dumps(value, default=str)
         if field.encrypted and self.encryptor:
             return self.encryptor.encrypt(value)
         if isinstance(value, (date, datetime)):
@@ -201,12 +206,26 @@ class SheetManager:
         await self.bulk_insert([data])
 
     async def bulk_insert(self, records: List[Dict[str, Any]]) -> int:
-        """Insert many records in a single append call. Returns the number inserted."""
+        """Insert many records in a single append call. Returns the number inserted.
+
+        If the schema declares any `unique` / `primary_key` field, the batch is
+        checked against the existing rows (and itself) first and a clashing key
+        raises `DuplicateKeyError` — use `upsert()` to insert-or-update instead.
+        That check is a read-check-write, so two concurrent inserts of the same new
+        key can still both land; schemas with no unique field skip the read entirely.
+        """
         self._require_sheet()
         await self._ensure_connected()
         rows = [self._encode_row(r) for r in records]
         if not rows:
             return 0
+        await self._check_unique(records)
+        await self._append_rows(rows)
+        logger.info("Inserted %d row(s)", len(rows))
+        return len(rows)
+
+    async def _append_rows(self, rows: List[List[Any]]) -> None:
+        """Append already-encoded rows to the tab (no validation or uniqueness check)."""
         await execute(
             self.connection.service.spreadsheets()
             .values()
@@ -218,8 +237,30 @@ class SheetManager:
             ),
             op="insert",
         )
-        logger.info("Inserted %d row(s)", len(rows))
-        return len(rows)
+
+    async def _check_unique(self, records: List[Dict[str, Any]]) -> None:
+        """Reject a batch that would duplicate any `unique`/`primary_key` field.
+
+        Compares incoming values (in their schema type) against the values already
+        in the sheet and against earlier records in the same batch. No-ops when the
+        schema has no unique field, so the common insert path stays read-free.
+        """
+        if not self.schema.unique_fields:
+            return
+        existing = await self._read_indexed()
+        for field in self.schema.unique_fields:
+            seen = {r.get(field.name) for r in existing if r.get(field.name) not in (None, "")}
+            for record in records:
+                value = record.get(field.name)
+                if value in (None, ""):
+                    continue
+                typed = self.schema._convert_value(value, field.field_type)
+                if typed in seen:
+                    raise DuplicateKeyError(
+                        f"Duplicate value for unique field '{field.name}': {typed!r} "
+                        f"already exists. Use upsert() to insert-or-update, or change it."
+                    )
+                seen.add(typed)
 
     async def from_dataframe(self, df) -> int:
         """Insert every row of a pandas DataFrame in bulk. Returns the number inserted."""
@@ -372,6 +413,36 @@ class SheetManager:
                 return sheet["properties"]["sheetId"]
         raise NotFoundError(f"Tab '{self.schema.name}' not found in spreadsheet {self.sheet_id}.")
 
+    def _update_cells_request(
+        self, sheet_id: int, row_index: int, record: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Build a single ``updateCells`` request writing ``record`` to one sheet row.
+
+        ``record`` is the full row (all field names → values); callers merge their
+        changes over the existing values first. ``row_index`` is 0-based (header = 0).
+        """
+        values = [self._user_entered(field, record.get(field.name)) for field in self.schema.fields]
+        return {
+            "updateCells": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "startRowIndex": row_index,
+                    "endRowIndex": row_index + 1,
+                    "startColumnIndex": 0,
+                    "endColumnIndex": len(self.schema.fields),
+                },
+                "rows": [{"values": [{"userEnteredValue": v} for v in values]}],
+                "fields": "userEnteredValue",
+            }
+        }
+
+    @staticmethod
+    def _merge(record: Dict[str, Any], changes: Dict[str, Any]) -> Dict[str, Any]:
+        """Overlay ``changes`` on an existing record, dropping the internal row index."""
+        merged = {k: v for k, v in record.items() if k != "_row_index"}
+        merged.update(changes)
+        return merged
+
     async def update(self, filters: Dict[str, Any], updates: Dict[str, Any]) -> int:
         """Update records matching the filters. Returns the number of rows updated."""
         self._require_sheet()
@@ -381,31 +452,10 @@ class SheetManager:
             return 0
 
         sheet_id = await self._tab_id()
-        requests = []
-        for record in matching_records:
-            row_index = record["_row_index"]  # 0-based sheet row (header is row 0)
-            values = [
-                self._user_entered(
-                    field, updates[field.name] if field.name in updates else record.get(field.name)
-                )
-                for field in self.schema.fields
-            ]
-            requests.append(
-                {
-                    "updateCells": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "startRowIndex": row_index,
-                            "endRowIndex": row_index + 1,
-                            "startColumnIndex": 0,
-                            "endColumnIndex": len(self.schema.fields),
-                        },
-                        "rows": [{"values": [{"userEnteredValue": v} for v in values]}],
-                        "fields": "userEnteredValue",
-                    }
-                }
-            )
-
+        requests = [
+            self._update_cells_request(sheet_id, record["_row_index"], self._merge(record, updates))
+            for record in matching_records
+        ]
         await execute(
             self.connection.service.spreadsheets().batchUpdate(
                 spreadsheetId=self.sheet_id, body={"requests": requests}
@@ -413,6 +463,99 @@ class SheetManager:
             op="update",
         )
         return len(matching_records)
+
+    async def upsert(self, data: Dict[str, Any], *, key: Optional[str] = None) -> str:
+        """Insert ``data``, or update the existing row with the same key.
+
+        The key defaults to the schema's `primary_key`; pass ``key="field"`` to match
+        on another field instead. On a match the row is updated (fields you omit keep
+        their current value); otherwise the record is inserted.
+
+        Args:
+            data: the record to insert or merge in; must include the key field.
+            key: field to match on (defaults to the schema's primary key).
+
+        Returns:
+            ``"inserted"`` or ``"updated"``.
+
+        Raises:
+            ValidationError: no key is available, or ``data`` omits the key value.
+
+        Note:
+            This is a read-check-write — Google Sheets has no conditional write — so
+            two concurrent upserts of the same new key can both insert (duplicate), and
+            concurrent updates are last-write-wins.
+        """
+        result = await self.bulk_upsert([data], key=key)
+        return "updated" if result["updated"] else "inserted"
+
+    async def bulk_upsert(
+        self, records: List[Dict[str, Any]], *, key: Optional[str] = None
+    ) -> Dict[str, int]:
+        """Insert-or-update many records keyed on ``key`` (default: the primary key).
+
+        Reads the tab once, then appends the new rows and updates the matching ones —
+        at most one append plus one batched update. Within ``records``, the last entry
+        for a given key wins. Returns ``{"inserted": n, "updated": m}`` (row counts).
+        See `upsert()` for the race-window caveat.
+        """
+        self._require_sheet()
+        key = key or self.schema.primary_key
+        if not key:
+            raise ValidationError(
+                "upsert needs a key. Declare one with Field(..., primary_key=True), "
+                "or pass key='<field>' to match on a specific field."
+            )
+        if key not in self._field_map:
+            raise ValidationError(
+                f"Unknown key field '{key}'. Fields: {', '.join(self._field_map)}."
+            )
+
+        field = self._field_map[key]
+        # Last-write-wins within the batch; key the dict by the typed key value.
+        deduped: Dict[Any, Dict[str, Any]] = {}
+        for record in records:
+            value = record.get(key)
+            if value in (None, ""):
+                raise ValidationError(f"upsert requires a value for key field '{key}'.")
+            deduped[self.schema._convert_value(value, field.field_type)] = record
+        if not deduped:
+            return {"inserted": 0, "updated": 0}
+
+        await self._ensure_connected()
+        existing = await self._read_indexed()
+        # Key value -> the existing records (a list, in case legacy data has duplicates).
+        by_key: Dict[Any, List[Dict[str, Any]]] = {}
+        for record in existing:
+            by_key.setdefault(record.get(key), []).append(record)
+
+        to_append: List[List[Any]] = []
+        update_requests: List[Dict[str, Any]] = []
+        sheet_id: Optional[int] = None
+        for key_value, record in deduped.items():
+            matches = by_key.get(key_value)
+            if matches:
+                if sheet_id is None:
+                    sheet_id = await self._tab_id()
+                for existing_row in matches:
+                    merged = self._merge(existing_row, record)
+                    update_requests.append(
+                        self._update_cells_request(sheet_id, existing_row["_row_index"], merged)
+                    )
+            else:
+                to_append.append(self._encode_row(record))
+
+        if to_append:
+            await self._append_rows(to_append)
+        if update_requests:
+            await execute(
+                self.connection.service.spreadsheets().batchUpdate(
+                    spreadsheetId=self.sheet_id, body={"requests": update_requests}
+                ),
+                op="upsert",
+            )
+        logger.info("Upserted: %d inserted, %d updated", len(to_append), len(update_requests))
+        return {"inserted": len(to_append), "updated": len(update_requests)}
 
     async def delete(self, filters: Dict[str, Any]) -> int:
         """Delete rows matching the filters. Returns the number of rows deleted.
@@ -589,11 +732,72 @@ class SheetManager:
         )
         logger.info("Renamed sheet to: %s", new_title)
 
+    def _drive(self):
+        """Build a Drive v3 client for ownership-level ops on sheets GSAB created."""
+        return build("drive", "v3", credentials=self.connection.credentials)
+
+    @property
+    def csv_url(self) -> str:
+        """CSV-export URL for this spreadsheet's first tab.
+
+        Anyone can fetch it once you call ``share()`` (otherwise it needs an
+        authenticated request) — handy for embedding or ``pandas.read_csv(db.csv_url)``.
+        """
+        self._require_sheet()
+        return f"https://docs.google.com/spreadsheets/d/{self.sheet_id}/export?format=csv"
+
+    async def share(self, *, role: str = "reader") -> str:
+        """Make this spreadsheet readable by anyone with the link; return its URL.
+
+        Adds an "anyone with the link" permission via Drive. This works on the
+        default ``drive.file`` scope — GSAB owns the sheets it creates, so no broader
+        or sensitive scope is needed. Idempotent; revoke with ``unshare()``.
+
+        Args:
+            role: ``"reader"`` (default, view-only) or ``"writer"`` (anyone with the
+                link can edit — i.e. the public; use with care).
+
+        Returns:
+            The shareable spreadsheet URL.
+        """
+        if role not in ("reader", "writer"):
+            raise ValidationError("share role must be 'reader' or 'writer'.")
+        self._require_sheet()
+        await self._ensure_connected()
+        drive = self._drive()
+        await execute(
+            drive.permissions().create(
+                fileId=self.sheet_id, body={"type": "anyone", "role": role}, fields="id"
+            ),
+            op="share",
+        )
+        meta = await execute(
+            drive.files().get(fileId=self.sheet_id, fields="webViewLink"), op="share"
+        )
+        url = meta.get("webViewLink", f"https://docs.google.com/spreadsheets/d/{self.sheet_id}")
+        logger.info("Shared spreadsheet publicly (%s): %s", role, url)
+        return url
+
+    async def unshare(self) -> None:
+        """Revoke the public "anyone with the link" access added by ``share()``."""
+        self._require_sheet()
+        await self._ensure_connected()
+        try:
+            await execute(
+                self._drive()
+                .permissions()
+                .delete(fileId=self.sheet_id, permissionId="anyoneWithLink"),
+                op="unshare",
+            )
+            logger.info("Revoked public access: %s", self.sheet_id)
+        except NotFoundError:
+            pass  # already not shared — nothing to revoke
+
     async def delete_sheet(self) -> None:
         """Delete the entire spreadsheet via the Drive API (falls back to clearing rows)."""
         self._require_sheet()
         await self._ensure_connected()
-        drive_service = build("drive", "v3", credentials=self.connection.credentials)
+        drive_service = self._drive()
         try:
             await execute(
                 drive_service.files().delete(fileId=self.sheet_id, supportsAllDrives=True),

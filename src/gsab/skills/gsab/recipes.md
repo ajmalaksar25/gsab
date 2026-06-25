@@ -39,6 +39,42 @@ out.describe()
 await db.chart(x="brand", y="price_eur", kind="BAR", title="Price by brand")
 ```
 
+## Idempotent writes (upsert on a primary key)
+
+```python
+schema = Schema("users", [
+    Field("id", FieldType.INTEGER, primary_key=True),   # enforced unique key
+    Field("name", FieldType.STRING),
+    Field("plan", FieldType.STRING, default="free"),   # default => optional
+])
+db = SheetManager(SheetConnection(), schema)
+await db.create_sheet("Users")
+
+await db.insert({"id": 1, "name": "Ada", "plan": "pro"})
+# await db.insert({"id": 1, ...})        # -> DuplicateKeyError (id already exists)
+
+await db.upsert({"id": 1, "plan": "free"})             # -> "updated" (name kept)
+await db.upsert({"id": 2, "name": "Lin"})              # -> "inserted"
+await db.bulk_upsert([{"id": 1}, {"id": 3, "name": "Eve"}])  # -> {"inserted": 1, "updated": 1}
+```
+
+It's a read-check-write (Sheets has no conditional write): two concurrent upserts of the
+same *new* key can both insert. Pass `key="field"` to upsert on a non-PK column.
+
+## Publish a sheet to a public link
+
+```python
+await db.create_sheet("Public data")
+await db.bulk_insert([{ "id": 1, "name": "Ada" }])
+url = await db.share()           # anyone with the link can view; returns the URL
+print(url, "·", db.csv_url)      # csv_url is publicly fetchable once shared
+# pandas.read_csv(db.csv_url)    # ...or load it anywhere, no auth needed
+await db.unshare()               # revoke
+```
+
+Works on the default `drive.file` scope (GSAB owns the sheets it creates). Only sheets GSAB
+created, not a user's pre-existing ones.
+
 ## Encrypted fields
 
 ```python

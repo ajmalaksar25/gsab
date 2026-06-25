@@ -4,6 +4,7 @@ from .custom_exceptions import (
     APIError,
     AuthError,
     ConnectionError,
+    DuplicateKeyError,
     EncryptionError,
     GSABError,
     GSheetsDBException,
@@ -22,6 +23,7 @@ __all__ = [
     "PermissionDeniedError",
     "QuotaExceededError",
     "ValidationError",
+    "DuplicateKeyError",
     "EncryptionError",
     "APIError",
 ]

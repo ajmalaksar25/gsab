@@ -11,6 +11,14 @@ from gsab.core.sheet_manager import SheetManager
 # Load environment variables
 load_dotenv()
 
+# These are LIVE integration tests: they create/mutate/delete real Google Sheets via
+# the developer's cached credentials. Skip them unless explicitly opted in, so a bare
+# `pytest` never touches a real account. (CI runs the offline suite only.)
+pytestmark = pytest.mark.skipif(
+    os.getenv("GSAB_RUN_LIVE_TESTS") != "1",
+    reason="live test — set GSAB_RUN_LIVE_TESTS=1 to run against a real Google account",
+)
+
 
 class TestSetup:
     """Test setup and utilities."""
@@ -212,15 +220,22 @@ async def test_encryption(encryption_key):
     # Insert with encryption
     await manager.insert(test_data)
 
-    # Read back and verify encryption
+    # Encryption at rest: read the RAW stored cell (no decryption) and confirm it
+    # is ciphertext, not the plaintext. read() auto-decrypts, which would hide this.
+    raw = (
+        connection.service.spreadsheets()
+        .values()
+        .get(spreadsheetId=manager.sheet_id, range="test_data!A:Z")
+        .execute()
+    )
+    header, row = raw["values"][0], raw["values"][1]
+    raw_notes = row[header.index("notes")]
+    assert raw_notes != sensitive_note, "Data was not encrypted at rest"
+    assert manager.encryptor.decrypt(raw_notes) == sensitive_note
+
+    # read() decrypts transparently, so the caller sees the plaintext back.
     records = await manager.read({"id": 1})
     assert len(records) == 1
-
-    encrypted_record = records[0]
-    assert encrypted_record["notes"] != sensitive_note, "Data was not encrypted"
-
-    # Verify decryption
-    decrypted_note = manager.encryptor.decrypt(encrypted_record["notes"])
-    assert decrypted_note == sensitive_note, "Decryption failed"
+    assert records[0]["notes"] == sensitive_note
 
     await manager.delete_sheet()

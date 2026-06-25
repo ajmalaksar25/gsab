@@ -1,6 +1,7 @@
 """GSAB utilities."""
 
 from .encryption import Encryptor
-from .quota_monitor import QuotaMonitor
 
-__all__ = ["Encryptor", "QuotaMonitor"]
+# Note: `quota_monitor.QuotaMonitor` is intentionally not exported yet — it's an unused
+# seed for the planned rate-aware batching layer, not part of the public surface.
+__all__ = ["Encryptor"]

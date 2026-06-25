@@ -1,3 +1,4 @@
+import json
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -39,9 +40,15 @@ class Field:
     Args:
         name: the column header.
         field_type: a `FieldType`.
-        required: reject writes that omit this field. Defaults to True.
-        unique: advisory flag that values should be unique.
-        default: value used when the field is omitted on insert.
+        required: reject writes that omit this field. Defaults to True, but a field
+            with a `default` is treated as optional (the default fills it in).
+        unique: enforce that values stay unique. Checked on `insert`/`upsert` with a
+            read-check-write (Sheets has no DB-level constraint), so a duplicate raises
+            `DuplicateKeyError`; concurrent writes of the same new value can still race.
+        primary_key: mark this field as the table's key. Implies `required` and `unique`,
+            and is the default key `upsert()` matches on. At most one per schema.
+        default: value used when the field is omitted on insert; setting it also makes
+            the field optional.
         min_length / max_length: string-length bounds.
         pattern: a regex the value must fully satisfy.
         min_value / max_value: numeric bounds.
@@ -54,6 +61,7 @@ class Field:
     field_type: FieldType
     required: bool = True
     unique: bool = False
+    primary_key: bool = False
     default: Any = None
     min_length: Optional[int] = None
     max_length: Optional[int] = None
@@ -64,6 +72,10 @@ class Field:
     encrypted: bool = False
 
     def __post_init__(self):
+        if self.primary_key:
+            # A primary key is required and unique by definition.
+            self.required = True
+            self.unique = True
         self.validation_rules = self.validation_rules or []
         self._add_default_validations()
 
@@ -118,53 +130,77 @@ class Schema:
         self.fields = fields
         self._validate_schema()
         self._field_map = {field.name: field for field in fields}
+        # The primary-key field name (or None), and every uniqueness-enforced field.
+        pks = [field.name for field in fields if field.primary_key]
+        self.primary_key: Optional[str] = pks[0] if pks else None
+        self.unique_fields: List[Field] = [field for field in fields if field.unique]
 
     def _validate_schema(self) -> None:
         """Validate schema definition."""
         field_names = set()
+        pks = []
         for field in self.fields:
             if field.name in field_names:
                 raise ValueError(f"Duplicate field name: {field.name}")
             field_names.add(field.name)
+            if field.primary_key:
+                pks.append(field.name)
+        if len(pks) > 1:
+            raise ValueError(
+                f"A schema can have at most one primary_key (got {pks}). "
+                "Composite keys aren't supported — use a single key column."
+            )
 
     def validate_value(self, field_name: str, value: Any) -> List[str]:
-        """
-        Validate a value against field rules.
+        """Validate one value against its field's type and constraints.
+
+        Checks the type, then every constraint on the field — ``min_value`` /
+        ``max_value``, ``min_length`` / ``max_length``, ``pattern`` and any custom
+        ``validation_rules`` (all carried as the field's ``validation_rules``).
 
         Args:
-            field_name: Name of the field
-            value: Value to validate
+            field_name: Name of the field.
+            value: Value to validate.
 
         Returns:
-            List of validation error messages (empty if valid)
+            List of validation error messages (empty if valid).
         """
         field = self._field_map.get(field_name)
         if not field:
             raise ValueError(f"Unknown field: {field_name}")
 
-        errors = []
-
-        # Skip validation for None values if field is not required
+        # Missing / explicit None — required unless a default fills it on write.
         if value is None:
-            if field.required:
-                errors.append(f"Field {field_name} is required")
-            return errors
+            if field.required and field.default is None:
+                return [f"Field {field_name} is required"]
+            return []
 
-        # Type validation
-        try:
-            self._convert_value(value, field.field_type)
-        except ValueError as e:
-            errors.append(str(e))
-            return errors
+        ft = field.field_type
+        # Type checks: a bool is not a number, a number is not a bool, etc.
+        if ft in (FieldType.INTEGER, FieldType.FLOAT):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                return [f"Invalid value for type {ft}: {value}"]
+        elif ft == FieldType.BOOLEAN:
+            if not isinstance(value, bool):
+                return [f"Invalid value for type {ft}: {value}"]
+        elif ft == FieldType.STRING:
+            if not isinstance(value, str):
+                return [f"Invalid value for type {ft}: {value}"]
+        else:
+            # DATE / DATETIME / JSON / ENCRYPTED — validate by coercion.
+            try:
+                self._convert_value(value, ft)
+            except ValueError as e:
+                return [str(e)]
 
-        # Custom validation rules
+        # Constraint + custom rules (min/max, lengths, pattern, validation_rules).
+        errors = []
         for rule in field.validation_rules:
             try:
                 if not rule.condition(value):
                     errors.append(rule.error_message)
             except Exception as e:
                 errors.append(f"Validation error: {str(e)}")
-
         return errors
 
     def _convert_value(self, value: Any, field_type: FieldType) -> Any:
@@ -188,64 +224,29 @@ class Schema:
                 elif isinstance(value, datetime):
                     return value
                 raise ValueError("Invalid datetime format")
+            elif field_type == FieldType.JSON:
+                # Decode a stored JSON string back to an object; pass objects through.
+                return json.loads(value) if isinstance(value, str) else value
             else:
                 return str(value)
         except Exception as e:
             raise ValueError(f"Invalid value for type {field_type}: {value}") from e
 
-    def validate_field(self, field_name: str, value: Any) -> List[str]:
-        """Validate a single field value."""
-        errors = []
-        field = self.get_field(field_name)
-
-        if field:
-            # Type validation
-            if field.field_type == FieldType.INTEGER:
-                if not isinstance(value, (int, float)) or isinstance(value, bool):
-                    errors.append(f"Invalid value for type {field.field_type}: {value}")
-                elif field_name == "age" and value < 0:
-                    errors.append("Age must be a positive number")
-
-            elif field.field_type == FieldType.FLOAT:
-                if not isinstance(value, (int, float)) or isinstance(value, bool):
-                    errors.append(f"Invalid value for type {field.field_type}: {value}")
-
-            elif field.field_type == FieldType.BOOLEAN:
-                if not isinstance(value, bool):
-                    errors.append(f"Invalid value for type {field.field_type}: {value}")
-
-            elif field.field_type == FieldType.STRING:
-                if not isinstance(value, str):
-                    errors.append(f"Invalid value for type {field.field_type}: {value}")
-                elif field.pattern and not re.match(field.pattern, value):
-                    errors.append(f"Value does not match pattern {field.pattern}: {value}")
-
-        return errors
-
     def validate(self, data: Dict[str, Any]) -> List[str]:
-        """
-        Validate data against schema.
+        """Validate a record against the schema (types + every field constraint).
+
+        A field with a `default` is optional — the default fills it on write, so
+        its absence is never an error.
 
         Args:
-            data: Dictionary of field values to validate
+            data: Dictionary of field values to validate.
 
         Returns:
-            List of validation error messages
+            List of validation error messages (empty if valid).
         """
         errors = []
-
-        # Check required fields
         for field in self.fields:
-            if field.required and field.name not in data:
-                errors.append(f"Field {field.name} is required")
-                continue
-
-            value = data.get(field.name)
-            if value is not None:
-                # Validate field value
-                field_errors = self.validate_field(field.name, value)
-                errors.extend(field_errors)
-
+            errors.extend(self.validate_value(field.name, data.get(field.name)))
         return errors
 
     def get_field(self, field_name: str) -> Optional[Field]:

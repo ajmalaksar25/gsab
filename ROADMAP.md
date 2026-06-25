@@ -37,9 +37,20 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
   max_length`, **regex `pattern`**, custom `validation_rules`.
 - **Async CRUD** + rich `read()` filters (`$eq $ne $gt $gte $lt $lte $in $nin $contains
   $regex`), `bulk_insert`, type-correct **server-side `query()`** (Google Visualization).
+- **Enforced keys + `upsert()`**: a `primary_key`/`unique` field is checked on write — a
+  duplicate `insert` raises `DuplicateKeyError`; `upsert()`/`bulk_upsert()` do idempotent
+  insert-or-update keyed on the PK. It's a read-check-write (Sheets has no conditional
+  write), so concurrent inserts of the same *new* key can still race — documented, not hidden.
 - **Charts** (native in-sheet `chart()`), **pandas bridge** (`to_dataframe`/`from_dataframe`).
+- **Public sharing**: `share()` makes a created sheet readable by anyone with the link (returns
+  the URL), `unshare()` revokes, `csv_url` is the export URL. Stays on the non-sensitive
+  `drive.file` scope — GSAB owns the sheets it creates. Only sheets GSAB created, not a user's
+  pre-existing ones.
 - **Field encryption** (Fernet).
 - **LLM-friendly errors** + retry/backoff; **installable skills** (`gsab skill install`).
+- **Get-productive-fast CLI**: `gsab doctor [--live]` (verify auth + a live round-trip),
+  `gsab init [--fastapi]` (scaffold a runnable project / FastAPI CRUD service),
+  `gsab import <csv>` (infer a schema + load a CSV), `gsab cookbook list|show` (ready recipes).
 - **Multiple independent connections to the same sheet** — verified: separate
   `SheetConnection`s on one sheet read each other's writes.
 
@@ -49,6 +60,10 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
   land (Google inserts appends atomically).
 - **Updates are last-write-wins**: concurrent updates to the same row leave one value and an
   intact row — there are **no transactions and no locking** (Sheets has none).
+- **Keys are enforced best-effort**: `primary_key`/`unique` are checked with a read before
+  the write, so duplicates from a single client are rejected — but two clients inserting the
+  same new key concurrently can both succeed (no conditional write). `upsert()` closes the
+  single-client idempotency gap; for strict cross-client uniqueness, serialize the writes.
 - **Reads are eventually consistent**; rate limits apply (≈300 reads/min, 60 writes/min per
   project by default).
 - Guidance: treat GSAB as an append-friendly, last-write-wins store. For write-heavy or
@@ -56,13 +71,8 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
 
 ## Next — Beta / Planned
 
-- **`gsab doctor`** — verify auth + a live round-trip (create→write→read→delete). *(Planned)*
-- **`gsab init [--fastapi]`** — scaffold a runnable project (and a FastAPI CRUD service). *(Planned)*
-- **`gsab import <csv>`** — infer a schema and load a CSV. *(Planned)*
-- **`gsab cookbook`** — emit ready recipes. *(Planned)*
-- **`upsert()` + enforced primary keys** — today `unique=True`/PK is **advisory** (verified:
-  inserting a duplicate id creates two rows). Planned: read-check-write upsert keyed on a PK,
-  with the race window documented (Sheets has no conditional write). *(Planned)*
+- **Rate-aware batching / pooling** — saturate the ~300 req/min budget safely (shared auth +
+  reusable clients + a batching layer), not persistent DB connections. *(Planned)*
 - **Pipe-friendly CLI** — JSON in/out so `gsab ... | jq` and stdin import work. *(Planned)*
 
 ## Experimental (shipped early, flagged in docs)

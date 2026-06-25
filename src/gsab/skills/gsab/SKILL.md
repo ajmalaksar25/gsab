@@ -29,9 +29,9 @@ import asyncio
 from gsab import SheetConnection, SheetManager, Schema, Field, FieldType
 
 schema = Schema("users", [
-    Field("id",    FieldType.INTEGER, required=True, unique=True),
+    Field("id",    FieldType.INTEGER, primary_key=True),       # enforced unique key
     Field("name",  FieldType.STRING,  required=True, max_length=80),
-    Field("plan",  FieldType.STRING,  default="free"),
+    Field("plan",  FieldType.STRING,  default="free"),       # default => optional
     Field("price", FieldType.FLOAT),
 ])
 
@@ -41,11 +41,14 @@ async def main():
 
     await db.insert({"id": 1, "name": "Ada", "plan": "pro", "price": 9.5})
     await db.bulk_insert([{ "id": 2, "name": "Linus", "plan": "free" }])
+    # duplicate id now raises DuplicateKeyError — use upsert() to insert-or-update:
+    await db.upsert({"id": 1, "plan": "team"})         # -> "updated" (omitted fields kept)
+    await db.bulk_upsert([{ "id": 3, "name": "Grace" }])  # -> {"inserted": 1, "updated": 0}
 
     rows = await db.read({"plan": "pro"})              # Python-side filter
     rows = await db.read({"price": {"$gte": 5}})       # operators: $eq $ne $gt $gte $lt $lte $in $nin $contains $regex
 
-    hits = await db.query("SELECT A, D WHERE D = 'pro' ORDER BY A DESC")  # server-side (gviz); columns by letter
+    hits = await db.query("SELECT A, D WHERE D = 'team' ORDER BY A DESC")  # server-side (gviz); columns by letter
     await db.update({"id": 1}, {"plan": "team"})       # returns rows changed
     await db.delete({"plan": "free"})                  # returns rows deleted
 
@@ -58,6 +61,7 @@ asyncio.run(main())
 
 - Every data method is `async` — `await` it (run inside `asyncio.run(...)`).
 - One `SheetManager` binds one `SheetConnection` + one `Schema` (one tab). `create_sheet(title)` makes a new spreadsheet; set `db.sheet_id` to use an existing one.
+- A `primary_key=True` (or `unique=True`) field is enforced: a duplicate `insert` raises `DuplicateKeyError`. Use `upsert(data)` / `bulk_upsert(records)` for idempotent insert-or-update keyed on the PK (read-check-write; concurrent inserts of the same new key can still race).
 - Numbers/bools are stored in their real type, so server-side `query()` numeric filters work; strings stay inert text.
 - Field types: `STRING, INTEGER, FLOAT, BOOLEAN, DATE, DATETIME, JSON, ENCRYPTED`. Mark a field `encrypted=True` and pass `encryption_key=` to seal it.
 - Errors all subclass `GSABError` with actionable messages (e.g. `AuthError` → "run `gsab auth login`").

@@ -9,7 +9,7 @@ Quickstart::
     from gsab import SheetConnection, SheetManager, Schema, Field, FieldType
 
     schema = Schema("users", [
-        Field("id",   FieldType.INTEGER, required=True, unique=True),
+        Field("id",   FieldType.INTEGER, primary_key=True),
         Field("name", FieldType.STRING),
         Field("plan", FieldType.STRING, default="free"),
     ])
@@ -18,8 +18,9 @@ Quickstart::
         db = SheetManager(SheetConnection(), schema)
         await db.create_sheet("My App DB")           # creates the spreadsheet
         await db.insert({"id": 1, "name": "Ada", "plan": "pro"})
-        rows = await db.read({"plan": "pro"})         # filter
-        hits = await db.query("SELECT A, B WHERE D = 'pro'")  # server-side
+        await db.upsert({"id": 1, "plan": "free"})    # idempotent — updates id=1
+        rows = await db.read({"plan": "free"})        # filter
+        hits = await db.query("SELECT A, B WHERE C = 'free'")  # server-side (C = plan)
 
     asyncio.run(main())
 
@@ -34,13 +35,14 @@ Key types:
 
 Errors: every exception subclasses ``GSABError`` — ``AuthError``,
 ``ConnectionError``, ``NotFoundError``, ``PermissionDeniedError``,
-``QuotaExceededError``, ``ValidationError``, ``APIError`` — with messages
-written to be actionable for people and LLM agents alike.
+``QuotaExceededError``, ``ValidationError``, ``DuplicateKeyError``,
+``APIError`` — with messages written to be actionable for people and LLM
+agents alike.
 
 Full documentation: https://gsab.ajmalaksar.com/docs
 """
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 from .auth import login, logout, resolve_credentials, status
 from .core.connection import SheetConnection
@@ -50,6 +52,7 @@ from .exceptions import (
     APIError,
     AuthError,
     ConnectionError,
+    DuplicateKeyError,
     GSABError,
     NotFoundError,
     PermissionDeniedError,
@@ -75,5 +78,6 @@ __all__ = [
     "PermissionDeniedError",
     "QuotaExceededError",
     "ValidationError",
+    "DuplicateKeyError",
     "APIError",
 ]
