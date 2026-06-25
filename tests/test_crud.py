@@ -453,6 +453,31 @@ async def test_share_and_unshare_drive_permissions(monkeypatch):
     assert calls["delete"] == "anyoneWithLink"
 
 
+async def test_watch_emits_initial_snapshot_then_diffs():
+    conn = FakeConnection([["id", "age"], ["1", "20"], ["2", "30"]])
+    db = SheetManager(conn, _pk_schema())
+    db.sheet_id = "SHEET"
+    w = db.watch(interval=0.001)
+
+    initial = await w.__anext__()
+    assert initial == {
+        "added": [{"id": 1, "age": 20}, {"id": 2, "age": 30}],
+        "updated": [],
+        "removed": [],
+    }
+
+    conn.grid = [["id", "age"], ["1", "20"], ["2", "30"], ["3", "40"]]  # add id=3
+    assert await w.__anext__() == {"added": [{"id": 3, "age": 40}], "updated": [], "removed": []}
+
+    conn.grid = [["id", "age"], ["1", "21"], ["2", "30"], ["3", "40"]]  # update id=1
+    assert await w.__anext__() == {"added": [], "updated": [{"id": 1, "age": 21}], "removed": []}
+
+    conn.grid = [["id", "age"], ["1", "21"], ["3", "40"]]  # remove id=2
+    assert await w.__anext__() == {"added": [], "updated": [], "removed": [{"id": 2, "age": 30}]}
+
+    await w.aclose()
+
+
 async def test_query_coerces_field_columns_to_schema_types(monkeypatch):
     # gviz returns numbers as floats; query() coerces columns that map to a schema
     # field back to its declared type (id/age -> int), leaving aggregate labels alone.

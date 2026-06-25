@@ -77,11 +77,19 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
 
 ## Experimental (shipped early, flagged in docs)
 
-- **Reactive / "realtime" reads** — Google Sheets has **no change-stream/push** for cell
-  edits, so true realtime (Supabase/Convex style) isn't possible directly. Planned approach:
-  a `watch()`/reactive layer that **polls + diffs + emits changes**, with helpers to drive a
-  Python UI or an HTML/websocket auto-refresh. Will ship Experimental and labeled as polling,
-  not push. *(Researching → Experimental)*
+- **Reactive `watch()`** *(Experimental, 0.7.0)* — Google Sheets has **no change-stream/push**
+  for cell edits (verified: Sheets API has none; Drive `changes.watch` is file-level and
+  batched ~every 3 min). So GSAB does the only portable thing: `watch()` **polls + diffs +
+  emits change events** (`{added, updated, removed}`), detecting writes from anyone — this
+  library, another connection, or a person editing in the Google UI. It's **polling (~1–2s),
+  not push** — labeled as such. The realtime recipe (`gsab cookbook show realtime_api`) shows
+  the scaling pattern: **one server-side `watch()` poller → fan out to N viewers over SSE**
+  (don't poll once per viewer), which keeps a sheet well under the rate limit.
+  - **Use-case envelope (no compromise inside it):** great for live dashboards, internal
+    tools, small-team collaborative apps, forms/submission feeds, config/content a non-dev
+    edits in the Sheet, prototypes — read-heavy, human-speed writes. **Not** for high-frequency
+    writes (chat, games, ticks), strict transactions, sub-second SLAs, >~10M cells, or many
+    writers to the same rows. GSAB gives a Convex-*feel* for that envelope, not a DB replacement.
 - **Form → sheet sync** — a custom app form calls `insert()` on submit (works today); Google
   Forms already write to a linked sheet which GSAB reads. A turnkey "form table stays in
   sync" helper builds on the reactive layer. *(Planned/Experimental)*

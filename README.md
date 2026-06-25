@@ -33,6 +33,7 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 - **Field encryption** — flag a field `encrypted=True` and it's sealed before it reaches the sheet.
 - **Async CRUD + upsert** — `insert / read / update / delete` plus `upsert()` for idempotent insert-or-update on a primary key, with rich filters (`$gt / $in / $contains / $regex` and more).
 - **Server-side queries** — `query()` runs the Google Visualization query language (filter, sort, aggregate) on Google's side, not in Python. Values come back type-correct.
+- **Reactive `watch()`** *(Experimental)* — an async generator that polls + diffs and emits `{added, updated, removed}`, seeing writes from any connection or the Google UI — drive a live, auto-updating UI. Polling (~1–2s), not push; one poller fans out to many viewers (see `examples/realtime-demo/`).
 - **pandas bridge** — `to_dataframe()` / `from_dataframe()` and `bulk_insert()` for the whole analytics ecosystem.
 - **Native charts** — `chart()` embeds a Google chart in the sheet; or hand `to_dataframe()` to matplotlib/Plotly.
 - **One-call public sharing** — `share()` publishes a created sheet to a read-only public link (and `csv_url` for embedding); `unshare()` revokes. No extra scope — GSAB owns the sheets it makes.
@@ -42,9 +43,9 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 
 ## Roadmap
 
-**Shipped (v0.6.0):** auth + CLI · schemas, validation & encryption · async CRUD · **upsert + enforced primary keys** · type-correct server-side query · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import (`gsab init` / `import` / `doctor` / `cookbook`) · keychain storage.
+**Shipped (v0.7.0):** auth + CLI · schemas, validation & encryption · async CRUD · upsert + enforced primary keys · type-correct server-side query · **reactive `watch()` (Experimental)** · one-call public sharing · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import (`gsab init` / `import` / `doctor` / `cookbook`) · keychain storage.
 
-**Coming next:** real-time / reactive mode (polling) · rate-aware batching · MCP server (use your sheets from Claude) · terminal UI · server-side date filters · one-click hosted sign-in.
+**Coming next:** auto update-available notice · rate-aware batching · MCP server (use your sheets from Claude) · improved/pipe-friendly CLI · a JavaScript client · terminal UI · one-click hosted sign-in.
 
 Full roadmap with per-feature stability (and what's deliberately out of scope) → [ROADMAP.md](ROADMAP.md). Live summary → [gsab.ajmalaksar.com/#roadmap](https://gsab.ajmalaksar.com/#roadmap).
 

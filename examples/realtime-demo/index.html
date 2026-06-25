@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GSAB · realtime demo</title>
+    <style>
+      :root { --emerald:#1b7a4b; --bright:#23a25e; --paper:#f7f6f2; --card:#fffffd; --ink:#17160f; --ink3:#8a8678; --line:#e6e4dc; }
+      * { box-sizing: border-box; }
+      body { margin:0; font:15px/1.5 ui-sans-serif,system-ui,"Segoe UI",sans-serif; color:var(--ink); background:var(--paper); }
+      header { display:flex; align-items:center; gap:14px; padding:14px 22px; border-bottom:1px solid var(--line); background:var(--card); }
+      header h1 { font-size:18px; margin:0; font-weight:700; }
+      header .tag { font-size:12px; color:var(--ink3); }
+      .live { margin-left:auto; display:flex; align-items:center; gap:7px; font-size:13px; font-weight:600; color:var(--emerald); }
+      .dot { width:9px; height:9px; border-radius:50%; background:var(--bright); box-shadow:0 0 0 0 rgba(35,162,94,.5); animation:pulse 1.6s infinite; }
+      @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(35,162,94,.5)} 70%{box-shadow:0 0 0 9px rgba(35,162,94,0)} 100%{box-shadow:0 0 0 0 rgba(35,162,94,0)} }
+      .panes { display:grid; grid-template-columns:1fr 1fr; gap:0; height:calc(100vh - 56px); }
+      .pane { display:flex; flex-direction:column; min-width:0; }
+      .pane:first-child { border-right:1px solid var(--line); }
+      .pane h2 { margin:0; padding:11px 22px; font-size:13px; font-weight:600; color:var(--ink3); border-bottom:1px solid var(--line); background:var(--paper); }
+      .pane h2 b { color:var(--ink); font-weight:700; }
+      iframe { flex:1; border:0; width:100%; }
+      .tablewrap { flex:1; overflow:auto; padding:18px 22px; }
+      table { width:100%; border-collapse:collapse; }
+      th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink3); padding:8px 12px; border-bottom:2px solid var(--line); }
+      td { padding:11px 12px; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+      tr.flash td { animation:flash 1.2s ease-out; }
+      @keyframes flash { 0%{background:rgba(35,162,94,.22)} 100%{background:transparent} }
+      .pill { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+      .todo{ background:#f0eee6; color:#6b6557; } .doing{ background:#fff1d6; color:#9a6b00; } .done{ background:#dcf0e4; color:var(--emerald); }
+      .hint { padding:10px 22px; font-size:13px; color:var(--ink3); border-top:1px solid var(--line); background:var(--card); }
+      .hint b { color:var(--emerald); }
+      /* portrait / narrow: stack the panes (sheet on top, app below) */
+      @media (max-aspect-ratio: 3/4) {
+        .panes { grid-template-columns:1fr; grid-template-rows:340px 1fr; }
+        .pane:first-child { border-right:0; border-bottom:1px solid var(--line); }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>GSAB <span class="tag">realtime demo</span></h1>
+      <span class="tag">Google Sheets as a Backend</span>
+      <span class="live"><span class="dot"></span> live</span>
+    </header>
+    <div class="panes">
+      <div class="pane">
+        <h2>① The Google Sheet — <b>edit a cell here</b></h2>
+        <iframe id="sheet" title="Google Sheet"></iframe>
+      </div>
+      <div class="pane">
+        <h2>② Your app, via GSAB <b>watch()</b> — <b>updates live</b></h2>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>id</th><th>task</th><th>owner</th><th>status</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="hint">Edit the sheet on the left → this table updates within <b>~1s</b>, with no refresh. One <code>watch()</code> poller drives every viewer.</div>
+      </div>
+    </div>
+    <script>
+      const rows = new Map();
+      const tbody = document.getElementById("rows");
+      const pill = (s) => `<span class="pill ${s||'todo'}">${s||'todo'}</span>`;
+
+      function render(flashIds = new Set()) {
+        const sorted = [...rows.values()].sort((a, b) => a.id - b.id);
+        tbody.innerHTML = sorted.map((r) =>
+          `<tr class="${flashIds.has(r.id) ? 'flash' : ''}"><td>${r.id}</td><td>${r.task ?? ""}</td><td>${r.owner ?? ""}</td><td>${pill(r.status)}</td></tr>`
+        ).join("");
+      }
+
+      fetch("/config").then((r) => r.json()).then((c) => {
+        document.getElementById("sheet").src = c.edit_url + "?rm=minimal";
+      });
+
+      const es = new EventSource("/events");
+      es.onmessage = (e) => {
+        const { added = [], updated = [], removed = [] } = JSON.parse(e.data);
+        const flash = new Set();
+        for (const r of added) { rows.set(r.id, r); flash.add(r.id); }
+        for (const r of updated) { rows.set(r.id, r); flash.add(r.id); }
+        for (const r of removed) rows.delete(r.id);
+        render(flash);
+      };
+    </script>
+  </body>
+</html>

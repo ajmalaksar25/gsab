@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -66,7 +67,8 @@ class SheetManager:
 
     Binds a `SheetConnection` to a `Schema` (one tab = one table) and exposes
     create / insert / read / update / delete / `upsert()`, server-side `query()`,
-    the pandas bridge (`to_dataframe()` / `from_dataframe()`) and native `chart()`.
+    reactive `watch()` (Experimental polling), one-call public `share()`, the pandas
+    bridge (`to_dataframe()` / `from_dataframe()`) and native `chart()`.
     Validation runs on every write; fields flagged `encrypted=True` are sealed
     before they reach the sheet and decrypted on read. A `unique`/`primary_key`
     field is enforced on insert/upsert (read-check-write; `DuplicateKeyError`).
@@ -314,6 +316,65 @@ class SheetManager:
         for record in records:
             record.pop("_row_index", None)
         return records
+
+    def _row_key(self, record: Dict[str, Any], key: Optional[str]) -> Any:
+        """Identity for diffing in `watch()`: the key field, else the whole row."""
+        if key:
+            return record.get(key)
+        # No key — fall back to the full row (stringified so it's hashable).
+        return tuple(str(record.get(f.name)) for f in self.schema.fields)
+
+    async def watch(
+        self,
+        *,
+        interval: float = 2.0,
+        filters: Optional[Dict[str, Any]] = None,
+        key: Optional[str] = None,
+        emit_initial: bool = True,
+    ):
+        """Poll the tab and yield change events as rows are added/updated/removed.
+
+        **Experimental — polling, not push.** Google Sheets has no change stream, so
+        this re-reads every ``interval`` seconds, diffs against the previous snapshot,
+        and yields a dict ``{"added": [...], "updated": [...], "removed": [...]}`` (rows
+        keyed on ``key``, defaulting to the schema's primary key; without one, whole-row
+        identity is used and duplicate rows collapse). It yields only when something
+        changed — plus one initial snapshot (all rows as ``added``) if ``emit_initial``.
+
+        Detects writes from anyone — this library, another connection, or a person
+        editing in the Google Sheets UI. Run **one** watcher per sheet and fan its
+        events out to many viewers (e.g. over SSE/WebSocket) rather than polling once
+        per viewer, to stay well within the rate limit. Updates appear within ~``interval``
+        seconds; pick a cadence that fits human-speed edits, not a high-frequency stream.
+
+        Args:
+            interval: seconds between polls.
+            filters: optional ``read()`` filters to watch a subset.
+            key: field to diff on (defaults to the schema's primary key).
+            emit_initial: yield the current rows as ``added`` before watching for changes.
+
+        Yields:
+            ``{"added": list, "updated": list, "removed": list}`` change sets.
+        """
+        self._require_sheet()
+        key = key or self.schema.primary_key
+        previous: Dict[Any, Dict[str, Any]] = {}
+        first = True
+        while True:
+            rows = await self.read(filters)
+            current = {self._row_key(r, key): r for r in rows}
+            if first:
+                if emit_initial and current:
+                    yield {"added": list(current.values()), "updated": [], "removed": []}
+            else:
+                added = [r for k, r in current.items() if k not in previous]
+                removed = [r for k, r in previous.items() if k not in current]
+                updated = [r for k, r in current.items() if k in previous and r != previous[k]]
+                if added or updated or removed:
+                    yield {"added": added, "updated": updated, "removed": removed}
+            previous = current
+            first = False
+            await asyncio.sleep(interval)
 
     async def _read_indexed(self, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Like :meth:`read`, but each record carries ``_row_index`` (its 0-based sheet

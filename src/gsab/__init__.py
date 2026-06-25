@@ -30,8 +30,9 @@ setup is needed.
 Key types:
     SheetConnection            resolve credentials and build the API client.
     Schema / Field / FieldType define a tab's columns, types and validation.
-    SheetManager               async create / insert / read / update / delete,
-                               plus server-side ``query()`` and native ``chart()``.
+    SheetManager               async create / insert / read / update / delete /
+                               ``upsert()``, server-side ``query()``, native ``chart()``,
+                               reactive ``watch()`` (Experimental) and public ``share()``.
 
 Errors: every exception subclasses ``GSABError`` — ``AuthError``,
 ``ConnectionError``, ``NotFoundError``, ``PermissionDeniedError``,
@@ -42,7 +43,7 @@ agents alike.
 Full documentation: https://gsab.ajmalaksar.com/docs
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 from .auth import login, logout, resolve_credentials, status
 from .core.connection import SheetConnection

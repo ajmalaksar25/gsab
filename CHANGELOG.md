@@ -3,6 +3,18 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.7.0] — 2026-06-25
+
+Reactive reads — your sheet, live. *(Experimental)*
+
+### Added
+- **`SheetManager.watch(*, interval=2.0, filters=None, key=None, emit_initial=True)`** — an async generator that polls the tab, diffs against the last snapshot, and yields `{"added", "updated", "removed"}` change sets (keyed on the primary key). It sees writes from **anyone** — this library, another connection, or a person editing in the Google Sheets UI — so you can drive a live, auto-updating UI. `async for change in db.watch(): ...`
+- **Realtime recipe** — `gsab cookbook show realtime_api`: the scaling pattern for many viewers — **one server-side `watch()` poller fans out to N browsers over Server-Sent Events** (don't poll once per viewer), which keeps a sheet well under the rate limit.
+- **Side-by-side demo** — `examples/realtime-demo/` (`python server.py`): the real Google Sheet on the left, your `watch()`-driven app on the right, updating live as you edit.
+
+### Notes
+- **Experimental — this is polling (~1–2s), not push.** Google Sheets has no change-stream/push (verified: Sheets API has none; Drive `changes.watch` is file-level and batched ~every 3 min), so polling + diff is the portable path. Great for live dashboards, internal tools, small-team collaboration, forms/feeds, config a non-dev edits, and prototypes — **not** for high-frequency writes, strict transactions, sub-second SLAs, huge/hot tables, or many writers to the same rows. A Convex-*feel* for that envelope, not a database replacement.
+
 ## [0.6.0] — 2026-06-24
 
 Primary keys and idempotent writes — make a sheet behave like a keyed table.
