@@ -43,7 +43,7 @@ agents alike.
 Full documentation: https://gsab.ajmalaksar.com/docs
 """
 
-__version__ = "0.7.1"
+__version__ = "0.7.2"
 
 from .auth import login, logout, resolve_credentials, status
 from .core.connection import SheetConnection

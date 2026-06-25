@@ -5,6 +5,8 @@ prints a one-line notice to stderr if the installed version is behind, and never
 raises or blocks a command. Opt out with ``GSAB_NO_UPDATE_CHECK=1``.
 """
 
+from __future__ import annotations  # so `str | None` parses on Python 3.9
+
 import json
 import os
 import sys

@@ -3,6 +3,14 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.7.2] — 2026-06-26
+
+### Fixed
+- **0.7.1's CLI crashed on Python 3.9.** The new update-check module used a PEP 604 `str | None` annotation, which 3.9 evaluates at definition time (`TypeError: unsupported operand type(s) for |`). Added `from __future__ import annotations`. (The library API was unaffected; 0.7.1 works on 3.10+. Upgrade if you're on 3.9.)
+
+### Changed
+- The publish workflow now **gates on lint + the offline test suite (Python 3.9 and 3.12)** before publishing to PyPI — a build that fails CI can no longer be released.
+
 ## [0.7.1] — 2026-06-26
 
 ### Added
