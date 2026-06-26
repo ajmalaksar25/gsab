@@ -39,7 +39,7 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 - **One-call public sharing** — `share()` publishes a created sheet to a read-only public link (and `csv_url` for embedding); `unshare()` revokes. No extra scope — GSAB owns the sheets it makes.
 - **Actionable errors** — Google API errors become clear GSAB exceptions with retry/backoff and token refresh — readable by humans and LLM agents.
 - **Installable agent skills** — `gsab skill install` drops GSAB skills into `.claude/skills` (or `--portable` for any LLM) so your coding agent knows the real API.
-- **MCP server** — `gsab mcp` lets Claude (or any MCP host) use your Google Sheet as a database directly: create, insert, read, query, upsert, share. `pip install "gsab[mcp]"`.
+- **MCP server** — `gsab mcp` lets any MCP client (Claude, Codex, Cursor, Zed, …) use your Google Sheet as a database directly: create, insert, read, query, upsert, share. `pip install "gsab[mcp]"`.
 - **Secure tokens** — stored in your OS keychain (keyring), with a 0600-file fallback.
 
 ## Roadmap
