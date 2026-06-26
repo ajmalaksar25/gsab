@@ -39,13 +39,14 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 - **One-call public sharing** — `share()` publishes a created sheet to a read-only public link (and `csv_url` for embedding); `unshare()` revokes. No extra scope — GSAB owns the sheets it makes.
 - **Actionable errors** — Google API errors become clear GSAB exceptions with retry/backoff and token refresh — readable by humans and LLM agents.
 - **Installable agent skills** — `gsab skill install` drops GSAB skills into `.claude/skills` (or `--portable` for any LLM) so your coding agent knows the real API.
+- **MCP server** — `gsab mcp` lets Claude (or any MCP host) use your Google Sheet as a database directly: create, insert, read, query, upsert, share. `pip install "gsab[mcp]"`.
 - **Secure tokens** — stored in your OS keychain (keyring), with a 0600-file fallback.
 
 ## Roadmap
 
-**Shipped (v0.7.1):** auth + CLI · schemas, validation & encryption · async CRUD · upsert + enforced primary keys · type-correct server-side query · **reactive `watch()` (Experimental)** · one-call public sharing · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import (`gsab init` / `import` / `doctor` / `cookbook`) · keychain storage.
+**Shipped (v0.8.0):** auth + CLI · schemas, validation & encryption · async CRUD · upsert + enforced primary keys · type-correct server-side query · **reactive `watch()` (Experimental)** · one-call public sharing · **MCP server** (`gsab mcp`) · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import (`gsab init` / `import` / `doctor` / `cookbook`) · keychain storage.
 
-**Coming next:** rate-aware batching · MCP server (use your sheets from Claude) · improved/pipe-friendly CLI · a JavaScript client · terminal UI · one-click hosted sign-in.
+**Coming next:** rate-aware batching · improved/pipe-friendly CLI · a JavaScript client · terminal UI · one-click hosted sign-in.
 
 Full roadmap with per-feature stability (and what's deliberately out of scope) → [ROADMAP.md](ROADMAP.md). Live summary → [gsab.ajmalaksar.com/#roadmap](https://gsab.ajmalaksar.com/#roadmap).
 

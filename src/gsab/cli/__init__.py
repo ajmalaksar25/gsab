@@ -47,6 +47,21 @@ def version() -> None:
     typer.echo(f"gsab {__version__}")
 
 
+@app.command("mcp")
+def mcp_cmd() -> None:
+    """Run the GSAB MCP server (stdio) so an MCP host like Claude can drive your sheets."""
+    try:
+        from ..mcp.server import main as run_server
+    except ImportError:
+        typer.secho(
+            "The MCP server needs the 'mcp' extra: pip install \"gsab[mcp]\"",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1) from None
+    run_server()
+
+
 @app.command("help")
 def help_cmd(
     ctx: typer.Context,

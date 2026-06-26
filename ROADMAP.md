@@ -48,6 +48,8 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
   pre-existing ones.
 - **Field encryption** (Fernet).
 - **LLM-friendly errors** + retry/backoff; **installable skills** (`gsab skill install`).
+- **MCP server** (`gsab mcp`, `pip install "gsab[mcp]"`) — drive a sheet as a database from
+  Claude or any MCP host: create / insert / read / update / delete / upsert / query / share.
 - **Get-productive-fast CLI**: `gsab doctor [--live]` (verify auth + a live round-trip),
   `gsab init [--fastapi]` (scaffold a runnable project / FastAPI CRUD service),
   `gsab import <csv>` (infer a schema + load a CSV), `gsab cookbook list|show` (ready recipes).
@@ -103,7 +105,8 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
 - **Connection pooling semantics** — for Sheets this means rate-limited concurrency + shared
   auth across reusable clients, plus a batching layer; not persistent DB connections.
   *(Researching)*
-- **MCP server** (drive sheets from Claude), **TUI**, **hosted easy-mode auth broker**. *(Planned)*
+- **A JavaScript client** (Convex-style parity for lightweight JS apps), **TUI**, **hosted
+  easy-mode auth broker**. *(Planned)* — (the **MCP server** shipped in 0.8.0, see above.)
 
 ## Out of scope (and why)
 

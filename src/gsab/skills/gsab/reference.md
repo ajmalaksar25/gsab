@@ -69,4 +69,11 @@ gsab auth logout
 gsab version
 gsab help [command]
 gsab skill install [--project] [--portable] [--path DIR]
+gsab mcp                       # run the MCP server (needs `pip install "gsab[mcp]"`)
 ```
+
+## MCP server
+
+`gsab mcp` runs a Model Context Protocol server (stdio) so an MCP host (Claude Desktop/Code) can use a sheet as a database. Tools: `create_sheet(title, columns, primary_key?)`, `columns`, `insert`, `read`, `update`, `delete`, `upsert`, `query`, `share`. Uses your existing GSAB auth. Configure the host to run command `gsab` with args `["mcp"]`.
+
+Env vars: `GSAB_NO_KEYRING=1` (skip the OS keychain — fixes macOS re-prompts), `GSAB_NO_UPDATE_CHECK=1` (silence the update notice), `GSAB_SERVICE_ACCOUNT` (headless auth).

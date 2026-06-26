@@ -3,6 +3,13 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.8.0] — 2026-06-26
+
+Use your Google Sheet as a database — from Claude.
+
+### Added
+- **MCP server** — `gsab mcp` runs a Model Context Protocol server (stdio) so an MCP host (Claude Desktop / Claude Code, or any MCP client) can drive your sheets directly. Tools: `create_sheet`, `columns`, `insert`, `read`, `update`, `delete`, `upsert`, `query`, `share`. Columns are treated as text; a created sheet can declare a `primary_key` to unlock enforced uniqueness + `upsert`. Auth uses your existing GSAB credentials (`gsab auth login` or a service account). Install with `pip install "gsab[mcp]"`; configure your host to run `gsab mcp`.
+
 ## [0.7.2] — 2026-06-26
 
 ### Fixed
