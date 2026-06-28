@@ -57,3 +57,12 @@ class EncryptionError(GSABError):
 
 class APIError(GSABError):
     """The Google Sheets API returned an unexpected error."""
+
+
+class PolicyError(GSABError):
+    """An operation was blocked by an ``AccessPolicy`` guardrail.
+
+    Raised when a client-side policy refuses an action — read-only mode, a sheet
+    outside the allowlist, a share role above the cap, sharing disabled, or an
+    unconfirmed destructive op. Not a Google error; adjust the policy or the call.
+    """

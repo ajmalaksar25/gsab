@@ -65,7 +65,7 @@ def _write_cache(latest: str) -> None:
 
 def _fetch_latest() -> str:
     req = urllib.request.Request(_PYPI, headers={"User-Agent": "gsab-update-check"})
-    with urllib.request.urlopen(req, timeout=_TIMEOUT) as r:  # noqa: S310 (https only)
+    with urllib.request.urlopen(req, timeout=_TIMEOUT) as r:  # noqa: S310  # nosec B310
         return json.loads(r.read())["info"]["version"]
 
 

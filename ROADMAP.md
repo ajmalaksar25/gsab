@@ -42,14 +42,21 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
   insert-or-update keyed on the PK. It's a read-check-write (Sheets has no conditional
   write), so concurrent inserts of the same *new* key can still race — documented, not hidden.
 - **Charts** (native in-sheet `chart()`), **pandas bridge** (`to_dataframe`/`from_dataframe`).
-- **Public sharing**: `share()` makes a created sheet readable by anyone with the link (returns
-  the URL), `unshare()` revokes, `csv_url` is the export URL. Stays on the non-sensitive
-  `drive.file` scope — GSAB owns the sheets it creates. Only sheets GSAB created, not a user's
-  pre-existing ones.
+- **Public sharing**: `share(role=...)` makes a created sheet accessible to anyone with the link
+  (`reader`/`commenter`/`writer`, returns the URL), `unshare()` revokes, `csv_url` is the export
+  URL. Stays on the non-sensitive `drive.file` scope — GSAB owns the sheets it creates. Only
+  sheets GSAB created, not a user's pre-existing ones.
 - **Field encryption** (Fernet).
+- **Access control (`AccessPolicy`)** — guardrails you pass to `SheetManager` / the MCP server and
+  share as a JSON profile: read-only mode, an optional allowed-sheets allowlist (on top of the
+  `drive.file` scope floor), a share-role default + cap (`reader`/`commenter`/`writer`),
+  destructive-op confirmation, and an `on_activity` hook. A client-side guardrail for control +
+  visibility — **not** the security boundary (the OAuth scope is). Plus a `bandit` + `pip-audit`
+  security CI and a multi-agent security review (no findings).
 - **LLM-friendly errors** + retry/backoff; **installable skills** (`gsab skill install`).
 - **MCP server** (`gsab mcp`, `pip install "gsab[mcp]"`) — drive a sheet as a database from
   Claude or any MCP host: create / insert / read / update / delete / upsert / query / share.
+  `--read-only` exposes only the read tools; `--policy profile.json` runs it under an `AccessPolicy`.
 - **Get-productive-fast CLI**: `gsab doctor [--live]` (verify auth + a live round-trip),
   `gsab init [--fastapi]` (scaffold a runnable project / FastAPI CRUD service),
   `gsab import <csv>` (infer a schema + load a CSV), `gsab cookbook list|show` (ready recipes).
@@ -105,8 +112,10 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
 - **Connection pooling semantics** — for Sheets this means rate-limited concurrency + shared
   auth across reusable clients, plus a batching layer; not persistent DB connections.
   *(Researching)*
-- **A JavaScript client** (Convex-style parity for lightweight JS apps), **TUI**, **hosted
-  easy-mode auth broker**. *(Planned)* — (the **MCP server** shipped in 0.8.0, see above.)
+- **A JavaScript client** (Convex-style parity for lightweight JS apps) — *in progress*: the
+  no-auth public read/query/watch tier already works in the browser. A **TUI** (terminal UI over
+  `AccessPolicy` — manage access + watch live activity) and a **hosted easy-mode auth broker** are
+  *Planned*. (The **MCP server** shipped in 0.8.0; **AccessPolicy** in 0.9.0 — see above.)
 
 ## Out of scope (and why)
 

@@ -11,6 +11,7 @@ from ..exceptions.custom_exceptions import DuplicateKeyError, NotFoundError, Val
 from ..utils.encryption import Encryptor
 from ..utils.errors import execute
 from .connection import SheetConnection
+from .policy import AccessPolicy
 from .schema import FieldType, Schema
 
 logging.basicConfig(level=logging.INFO)
@@ -91,12 +92,19 @@ class SheetManager:
     """
 
     def __init__(
-        self, connection: SheetConnection, schema: Schema, encryption_key: Optional[str] = None
+        self,
+        connection: SheetConnection,
+        schema: Schema,
+        encryption_key: Optional[str] = None,
+        *,
+        policy: Optional[AccessPolicy] = None,
     ):
         """Initialize sheet manager."""
         self.connection = connection
         self.schema = schema
         self.sheet_id = None
+        self.policy = policy or AccessPolicy()
+        self._created_here = False
         self._field_map = {field.name: field for field in self.schema.fields}
 
         # Initialize encryptor only if we have encrypted fields
@@ -106,12 +114,14 @@ class SheetManager:
         )
 
     def _require_sheet(self) -> None:
-        """Ensure a spreadsheet is bound before an operation runs."""
+        """Ensure a spreadsheet is bound (and policy-allowed) before an operation runs."""
         if not self.sheet_id:
             raise ValidationError(
                 "No spreadsheet bound. Call `await db.create_sheet(title)` first, "
                 "or set `db.sheet_id` to an existing spreadsheet id."
             )
+        if not self._created_here:
+            self.policy.ensure_sheet_allowed(self.sheet_id)
 
     async def _ensure_connected(self) -> None:
         if not self.connection.is_connected():
@@ -127,6 +137,7 @@ class SheetManager:
         Returns:
             Sheet ID
         """
+        self.policy.ensure_writable("create_sheet")
         await self._ensure_connected()
         spreadsheet = {
             "properties": {"title": title},
@@ -141,7 +152,9 @@ class SheetManager:
             self.connection.service.spreadsheets().create(body=spreadsheet), op="create_sheet"
         )
         self.sheet_id = result["spreadsheetId"]
+        self._created_here = True
         logger.info("Created new sheet with ID: %s", self.sheet_id)
+        self.policy.emit({"op": "create_sheet", "sheet_id": self.sheet_id, "title": title})
         return self.sheet_id
 
     def _cell(self, field, value: Any) -> Any:
@@ -217,6 +230,7 @@ class SheetManager:
         key can still both land; schemas with no unique field skip the read entirely.
         """
         self._require_sheet()
+        self.policy.ensure_writable("insert")
         await self._ensure_connected()
         rows = [self._encode_row(r) for r in records]
         if not rows:
@@ -224,6 +238,7 @@ class SheetManager:
         await self._check_unique(records)
         await self._append_rows(rows)
         logger.info("Inserted %d row(s)", len(rows))
+        self.policy.emit({"op": "insert", "sheet_id": self.sheet_id, "count": len(rows)})
         return len(rows)
 
     async def _append_rows(self, rows: List[List[Any]]) -> None:
@@ -315,6 +330,7 @@ class SheetManager:
         records = await self._read_indexed(filters)
         for record in records:
             record.pop("_row_index", None)
+        self.policy.emit({"op": "read", "sheet_id": self.sheet_id, "count": len(records)})
         return records
 
     def _row_key(self, record: Dict[str, Any], key: Optional[str]) -> Any:
@@ -461,6 +477,7 @@ class SheetManager:
                 field = self._field_map.get(key)
                 if field is not None and value is not None:
                     row[key] = self._decode_value(field, value)
+        self.policy.emit({"op": "query", "sheet_id": self.sheet_id, "count": len(rows)})
         return rows
 
     async def _tab_id(self) -> int:
@@ -507,6 +524,7 @@ class SheetManager:
     async def update(self, filters: Dict[str, Any], updates: Dict[str, Any]) -> int:
         """Update records matching the filters. Returns the number of rows updated."""
         self._require_sheet()
+        self.policy.ensure_writable("update")
         matching_records = await self._read_indexed(filters)
         if not matching_records:
             logger.info("No rows found matching the filters")
@@ -522,6 +540,9 @@ class SheetManager:
                 spreadsheetId=self.sheet_id, body={"requests": requests}
             ),
             op="update",
+        )
+        self.policy.emit(
+            {"op": "update", "sheet_id": self.sheet_id, "count": len(matching_records)}
         )
         return len(matching_records)
 
@@ -561,6 +582,7 @@ class SheetManager:
         See `upsert()` for the race-window caveat.
         """
         self._require_sheet()
+        self.policy.ensure_writable("upsert")
         key = key or self.schema.primary_key
         if not key:
             raise ValidationError(
@@ -616,16 +638,27 @@ class SheetManager:
                 op="upsert",
             )
         logger.info("Upserted: %d inserted, %d updated", len(to_append), len(update_requests))
+        self.policy.emit(
+            {
+                "op": "upsert",
+                "sheet_id": self.sheet_id,
+                "inserted": len(to_append),
+                "updated": len(update_requests),
+            }
+        )
         return {"inserted": len(to_append), "updated": len(update_requests)}
 
-    async def delete(self, filters: Dict[str, Any]) -> int:
+    async def delete(self, filters: Dict[str, Any], *, confirm: bool = False) -> int:
         """Delete rows matching the filters. Returns the number of rows deleted.
 
         Uses each record's true sheet row index (captured during ``read``), so
         duplicate rows are deleted correctly. Rows are removed bottom-up in one
-        batch call so earlier indices stay valid.
+        batch call so earlier indices stay valid. If the policy sets
+        ``confirm_destructive``, pass ``confirm=True`` to proceed.
         """
         self._require_sheet()
+        self.policy.ensure_writable("delete")
+        self.policy.ensure_destructive_ok("delete", confirm)
         rows = await self._read_indexed(filters)
         if not rows:
             return 0
@@ -652,6 +685,7 @@ class SheetManager:
             ),
             op="delete",
         )
+        self.policy.emit({"op": "delete", "sheet_id": self.sheet_id, "count": len(indices)})
         return len(indices)
 
     async def _grid_extent(self) -> tuple:
@@ -807,23 +841,26 @@ class SheetManager:
         self._require_sheet()
         return f"https://docs.google.com/spreadsheets/d/{self.sheet_id}/export?format=csv"
 
-    async def share(self, *, role: str = "reader") -> str:
-        """Make this spreadsheet readable by anyone with the link; return its URL.
+    async def share(self, *, role: Optional[str] = None) -> str:
+        """Make this spreadsheet accessible to anyone with the link; return its URL.
 
         Adds an "anyone with the link" permission via Drive. This works on the
         default ``drive.file`` scope — GSAB owns the sheets it creates, so no broader
         or sensitive scope is needed. Idempotent; revoke with ``unshare()``.
 
         Args:
-            role: ``"reader"`` (default, view-only) or ``"writer"`` (anyone with the
-                link can edit — i.e. the public; use with care).
+            role: the access level for "anyone with the link" — ``"reader"`` (view-only),
+                ``"commenter"``, or ``"writer"`` (anyone with the link can EDIT — use with
+                care). The Sheets UI term "editor" is accepted as an alias for ``"writer"``.
+                Defaults to the policy's ``default_share_role`` ("reader"); the policy's
+                ``max_share_role`` caps how high it may go.
 
         Returns:
             The shareable spreadsheet URL.
         """
-        if role not in ("reader", "writer"):
-            raise ValidationError("share role must be 'reader' or 'writer'.")
         self._require_sheet()
+        self.policy.ensure_writable("share")
+        role = self.policy.resolve_share_role(role)
         await self._ensure_connected()
         drive = self._drive()
         await execute(
@@ -837,6 +874,7 @@ class SheetManager:
         )
         url = meta.get("webViewLink", f"https://docs.google.com/spreadsheets/d/{self.sheet_id}")
         logger.info("Shared spreadsheet publicly (%s): %s", role, url)
+        self.policy.emit({"op": "share", "sheet_id": self.sheet_id, "role": role, "url": url})
         return url
 
     async def unshare(self) -> None:
@@ -857,6 +895,7 @@ class SheetManager:
     async def delete_sheet(self) -> None:
         """Delete the entire spreadsheet via the Drive API (falls back to clearing rows)."""
         self._require_sheet()
+        self.policy.ensure_writable("delete_sheet")
         await self._ensure_connected()
         drive_service = self._drive()
         try:

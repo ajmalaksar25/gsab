@@ -3,6 +3,21 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.9.0] — 2026-06-28
+
+Access control + a security pass — decide exactly what the library (and an AI agent) may do.
+
+### Added
+- **`AccessPolicy`** — client-side guardrails you construct in Python and pass to `SheetManager(..., policy=...)`, or save/load as a small JSON profile (`AccessPolicy.save` / `.load`) to share the same config across the library, the MCP server and (soon) the TUI. Controls: `read_only` (block every mutation), `allowed_sheets` (an optional id allowlist on top of the `drive.file` scope floor — a sheet GSAB *created* is always allowed), `allow_share` / `default_share_role` / `max_share_role` (cap how public a `share()` may go), `confirm_destructive` (require `confirm=True` on `delete`), and an `on_activity` hook (one event per op — the feed a UI renders). A guardrail layer for safety, control and visibility — **not** the security boundary (that stays the OAuth scope). New `PolicyError` (exported from `gsab`) is raised when a guardrail blocks an action.
+- **MCP access controls** — `gsab mcp --read-only` exposes only the read/query tools; `gsab mcp --policy profile.json` runs the server under an `AccessPolicy` (allowed sheets enforced before any network call, share-role cap, etc.). The `delete` tool is labeled destructive and returns an explicit "permanent, cannot be undone" warning.
+- **Security CI** — a `bandit` (SAST) + `pip-audit` (dependency CVEs) GitHub Actions workflow runs on every push / PR.
+
+### Changed
+- **`share(role=...)` now accepts `reader` / `commenter` / `writer`** (the Sheets UI term "editor" is an alias for "writer"); the role defaults to the policy's `default_share_role` and is capped by `max_share_role`. (Previously only `reader` / `writer`.)
+
+### Security
+- Ran a multi-agent security review of the package (input validation, auth, crypto, deserialization, data exposure) — **no vulnerabilities found**. The one `bandit` flag — the update-check `urlopen` on a fixed HTTPS URL — is a reviewed false positive, annotated `# nosec`.
+
 ## [0.8.0] — 2026-06-26
 
 Use your Google Sheet as a database — from Claude.
