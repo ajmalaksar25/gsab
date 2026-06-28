@@ -48,7 +48,18 @@ def version() -> None:
 
 
 @app.command("mcp")
-def mcp_cmd() -> None:
+def mcp_cmd(
+    read_only: bool = typer.Option(
+        False,
+        "--read-only",
+        help="Expose only the read/query tools — no writes, deletes or sharing.",
+    ),
+    policy: Optional[str] = typer.Option(
+        None,
+        "--policy",
+        help="Path to an AccessPolicy JSON profile (allowed sheets, share-role cap, etc.).",
+    ),
+) -> None:
     """Run the GSAB MCP server (stdio) so an MCP host like Claude can drive your sheets."""
     try:
         from ..mcp.server import main as run_server
@@ -59,7 +70,7 @@ def mcp_cmd() -> None:
             err=True,
         )
         raise typer.Exit(1) from None
-    run_server()
+    run_server(read_only=read_only, policy_path=policy)
 
 
 @app.command("help")

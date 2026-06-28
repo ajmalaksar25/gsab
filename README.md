@@ -36,15 +36,16 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 - **Reactive `watch()`** *(Experimental)* — an async generator that polls + diffs and emits `{added, updated, removed}`, seeing writes from any connection or the Google UI — drive a live, auto-updating UI. Polling (~1–2s), not push; one poller fans out to many viewers (see `examples/realtime-demo/`).
 - **pandas bridge** — `to_dataframe()` / `from_dataframe()` and `bulk_insert()` for the whole analytics ecosystem.
 - **Native charts** — `chart()` embeds a Google chart in the sheet; or hand `to_dataframe()` to matplotlib/Plotly.
-- **One-call public sharing** — `share()` publishes a created sheet to a read-only public link (and `csv_url` for embedding); `unshare()` revokes. No extra scope — GSAB owns the sheets it makes.
+- **One-call public sharing** — `share(role=...)` publishes a created sheet to a public link (`reader`/`commenter`/`writer`, default reader; `csv_url` for embedding); `unshare()` revokes. No extra scope — GSAB owns the sheets it makes.
+- **Access control (`AccessPolicy`)** — pass guardrails to `SheetManager` or the MCP server (and share them as a JSON profile): read-only mode, an allowed-sheets allowlist, a share-role cap, destructive-op confirmation, and an activity hook. A client-side guardrail for control + visibility — the OAuth scope stays the real boundary.
 - **Actionable errors** — Google API errors become clear GSAB exceptions with retry/backoff and token refresh — readable by humans and LLM agents.
 - **Installable agent skills** — `gsab skill install` drops GSAB skills into `.claude/skills` (or `--portable` for any LLM) so your coding agent knows the real API.
-- **MCP server** — `gsab mcp` lets any MCP client (Claude, Codex, Cursor, Zed, …) use your Google Sheet as a database directly: create, insert, read, query, upsert, share. `pip install "gsab[mcp]"`.
+- **MCP server** — `gsab mcp` lets any MCP client (Claude, Codex, Cursor, Zed, …) use your Google Sheet as a database directly: create, insert, read, query, upsert, share. `--read-only` and `--policy` apply access controls. `pip install "gsab[mcp]"`.
 - **Secure tokens** — stored in your OS keychain (keyring), with a 0600-file fallback.
 
 ## Roadmap
 
-**Shipped (v0.8.0):** auth + CLI · schemas, validation & encryption · async CRUD · upsert + enforced primary keys · type-correct server-side query · **reactive `watch()` (Experimental)** · one-call public sharing · **MCP server** (`gsab mcp`) · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import (`gsab init` / `import` / `doctor` / `cookbook`) · keychain storage.
+**Shipped (v0.9.0):** auth + CLI · schemas, validation & encryption · async CRUD · upsert + enforced primary keys · type-correct server-side query · **reactive `watch()` (Experimental)** · public sharing (reader/commenter/writer) · **MCP server** (`gsab mcp`, with `--read-only` / `--policy`) · **access control (`AccessPolicy`)** · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import · keychain storage · security CI (bandit + pip-audit).
 
 **Coming next:** rate-aware batching · improved/pipe-friendly CLI · a JavaScript client · terminal UI · one-click hosted sign-in.
 

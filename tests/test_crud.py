@@ -453,6 +453,103 @@ async def test_share_and_unshare_drive_permissions(monkeypatch):
     assert calls["delete"] == "anyoneWithLink"
 
 
+async def test_share_role_alias_and_commenter(monkeypatch):
+    # "editor" is a friendly alias for the API role "writer"; "commenter" is accepted.
+    bodies = []
+
+    class _FakeDrive:
+        def permissions(self):
+            return self
+
+        def files(self):
+            return self
+
+        def create(self, *, fileId, body, fields):
+            bodies.append(body)
+            return _Request({"id": "anyoneWithLink"})
+
+        def get(self, *, fileId, fields):
+            return _Request({"webViewLink": "https://docs.google.com/spreadsheets/d/SHEET/edit"})
+
+    db = SheetManager(FakeConnection([["id", "age"]]), _schema())
+    db.sheet_id = "SHEET"
+    monkeypatch.setattr(db, "_drive", lambda: _FakeDrive())
+
+    await db.share(role="editor")
+    await db.share(role="commenter")
+    assert [b["role"] for b in bodies] == ["writer", "commenter"]
+
+
+async def test_policy_read_only_blocks_writes():
+    from gsab import AccessPolicy
+    from gsab.exceptions import PolicyError
+
+    db = SheetManager(
+        FakeConnection([["id", "age"]]), _schema(), policy=AccessPolicy(read_only=True)
+    )
+    db.sheet_id = "S"
+    with pytest.raises(PolicyError):
+        await db.insert({"id": 1, "age": 20})
+
+
+async def test_policy_allowlist_blocks_foreign_sheet_but_allows_listed():
+    from gsab import AccessPolicy
+    from gsab.exceptions import PolicyError
+
+    db = SheetManager(
+        FakeConnection([["id", "age"], ["1", "20"]]),
+        _schema(),
+        policy=AccessPolicy(allowed_sheets=["OK"]),
+    )
+    db.sheet_id = "FORBIDDEN"
+    with pytest.raises(PolicyError):
+        await db.read()
+    db.sheet_id = "OK"
+    assert len(await db.read()) == 1
+
+
+async def test_policy_created_sheet_is_allowlist_exempt():
+    from gsab import AccessPolicy
+
+    db = SheetManager(
+        FakeConnection([["id", "age"], ["1", "20"]]),
+        _schema(),
+        policy=AccessPolicy(allowed_sheets=["OTHER"]),
+    )
+    db.sheet_id = "NEW"
+    db._created_here = True  # as create_sheet() would set it
+    assert len(await db.read()) == 1
+
+
+async def test_policy_on_activity_receives_events():
+    from gsab import AccessPolicy
+
+    events = []
+    db = SheetManager(
+        FakeConnection([["id", "age"], ["1", "20"]]),
+        _schema(),
+        policy=AccessPolicy(on_activity=events.append),
+    )
+    db.sheet_id = "S"
+    await db.read()
+    assert any(e["op"] == "read" and e["count"] == 1 for e in events)
+
+
+async def test_policy_confirm_destructive_gates_delete():
+    from gsab import AccessPolicy
+    from gsab.exceptions import PolicyError
+
+    db = SheetManager(
+        FakeConnection([["id", "age"], ["1", "20"]]),
+        _schema(),
+        policy=AccessPolicy(confirm_destructive=True),
+    )
+    db.sheet_id = "S"
+    with pytest.raises(PolicyError):
+        await db.delete({"id": 1})
+    assert await db.delete({"id": 1}, confirm=True) == 1
+
+
 async def test_watch_emits_initial_snapshot_then_diffs():
     conn = FakeConnection([["id", "age"], ["1", "20"], ["2", "30"]])
     db = SheetManager(conn, _pk_schema())

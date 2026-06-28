@@ -1,0 +1,31 @@
+name: Security
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install scanners + package
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit pip-audit
+          pip install .
+      - name: Bandit (static analysis of src/gsab)
+        run: bandit -r src/gsab -ll
+      - name: pip-audit (dependency CVEs — informational)
+        # Audits resolved dependencies for known CVEs. Non-blocking for now: deps are
+        # managed separately, so a transitive CVE with no fix shouldn't fail a build.
+        run: pip-audit --desc
+        continue-on-error: true

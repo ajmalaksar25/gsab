@@ -43,10 +43,11 @@ agents alike.
 Full documentation: https://gsab.ajmalaksar.com/docs
 """
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 from .auth import login, logout, resolve_credentials, status
 from .core.connection import SheetConnection
+from .core.policy import AccessPolicy
 from .core.schema import Field, FieldType, Schema, ValidationRule
 from .core.sheet_manager import SheetManager
 from .exceptions import (
@@ -57,6 +58,7 @@ from .exceptions import (
     GSABError,
     NotFoundError,
     PermissionDeniedError,
+    PolicyError,
     QuotaExceededError,
     ValidationError,
 )
@@ -68,6 +70,7 @@ __all__ = [
     "FieldType",
     "ValidationRule",
     "SheetManager",
+    "AccessPolicy",
     "resolve_credentials",
     "login",
     "logout",
@@ -81,4 +84,5 @@ __all__ = [
     "ValidationError",
     "DuplicateKeyError",
     "APIError",
+    "PolicyError",
 ]
