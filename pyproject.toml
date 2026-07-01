@@ -30,8 +30,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# `tui` and a FastAPI `server` are on the roadmap — their extras return when they ship.
+# A FastAPI `server` extra is on the roadmap — it returns when it ships.
 mcp = ["mcp>=1.2.0"]
+tui = ["textual>=0.86"]
 pandas = ["pandas>=2.0"]
 dev = [
     "pytest>=7.0.0",

@@ -54,6 +54,24 @@ def test_bad_role_field_rejected_at_construction():
         AccessPolicy(default_share_role="owner")
 
 
+def test_role_aliases_canonicalized_at_construction():
+    # Aliases are stored canonically so save/load and the TUI's role selects only ever
+    # see reader/commenter/writer.
+    p = AccessPolicy(default_share_role="editor", max_share_role="edit")
+    assert p.default_share_role == "writer"
+    assert p.max_share_role == "writer"
+
+
+def test_load_canonicalizes_alias_roles(tmp_path):
+    path = tmp_path / "p.json"
+    path.write_text(
+        '{"default_share_role": "viewer", "max_share_role": "comment"}', encoding="utf-8"
+    )
+    p = AccessPolicy.load(str(path))
+    assert p.default_share_role == "reader"
+    assert p.max_share_role == "commenter"
+
+
 def test_confirm_destructive_requires_confirm():
     p = AccessPolicy(confirm_destructive=True)
     with pytest.raises(PolicyError):
@@ -86,3 +104,19 @@ def test_load_ignores_unknown_keys(tmp_path):
     path = tmp_path / "policy.json"
     path.write_text('{"read_only": true, "bogus": 1}', encoding="utf-8")
     assert AccessPolicy.load(str(path)).read_only is True
+
+
+def test_save_does_not_copy_the_activity_hook(tmp_path):
+    # on_activity may be a bound method of an object that can't be deep-copied (e.g. the
+    # TUI app). save() must serialize the JSON fields without touching the hook.
+    class Sink:
+        def __deepcopy__(self, memo):  # pragma: no cover - only reached on regression
+            raise RuntimeError("the activity hook must not be deep-copied on save")
+
+        def __call__(self, event):
+            pass
+
+    path = str(tmp_path / "policy.json")
+    AccessPolicy(read_only=True, allowed_sheets=["A"], on_activity=Sink()).save(path)
+    loaded = AccessPolicy.load(path)
+    assert loaded.read_only is True and loaded.allowed_sheets == ["A"]
