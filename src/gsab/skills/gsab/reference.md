@@ -84,10 +84,12 @@ gsab version
 gsab help [command]
 gsab skill install [--project] [--portable] [--path DIR]
 gsab mcp [--read-only] [--policy PATH]   # MCP server (needs `pip install "gsab[mcp]"`)
+gsab tui [--policy PATH]                  # access-control TUI (needs `pip install "gsab[tui]"`)
 ```
 
-- `--read-only` — expose only the read/query tools (no create/insert/update/delete/share).
-- `--policy PATH` — run under an `AccessPolicy` JSON profile (allowed sheets, share-role cap, etc.).
+- `mcp --read-only` — expose only the read/query tools (no create/insert/update/delete/share).
+- `mcp --policy PATH` — run under an `AccessPolicy` JSON profile (allowed sheets, share-role cap, etc.).
+- `tui` — a terminal cockpit to edit an `AccessPolicy`, probe what it allows/blocks, and watch a live `on_activity` feed; save/loads the same JSON profile `--policy` reads.
 
 ## MCP server
 

@@ -86,6 +86,12 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
 
 ## Experimental (shipped early, flagged in docs)
 
+- **Access-control TUI** *(Experimental, 0.10.0)* — `gsab tui` (extra: `pip install "gsab[tui]"`)
+  is a terminal cockpit over `AccessPolicy`: edit the guardrails, manage the allowed-sheets
+  allowlist, **probe** whether an op would be allowed or blocked (the real check the library and
+  MCP server run), and watch a **live `on_activity` feed**. It save/loads the same JSON profile
+  `gsab mcp --policy` reads — one profile, three surfaces (library, MCP, TUI). Built on Textual;
+  the UI may still change.
 - **Reactive `watch()`** *(Experimental, 0.7.0)* — Google Sheets has **no change-stream/push**
   for cell edits (verified: Sheets API has none; Drive `changes.watch` is file-level and
   batched ~every 3 min). So GSAB does the only portable thing: `watch()` **polls + diffs +
@@ -113,9 +119,9 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
   auth across reusable clients, plus a batching layer; not persistent DB connections.
   *(Researching)*
 - **A JavaScript client** (Convex-style parity for lightweight JS apps) — *in progress*: the
-  no-auth public read/query/watch tier already works in the browser. A **TUI** (terminal UI over
-  `AccessPolicy` — manage access + watch live activity) and a **hosted easy-mode auth broker** are
-  *Planned*. (The **MCP server** shipped in 0.8.0; **AccessPolicy** in 0.9.0 — see above.)
+  no-auth public read/query/watch tier already works in the browser. A **hosted easy-mode auth
+  broker** is *Planned*. (The **MCP server** shipped in 0.8.0; **AccessPolicy** in 0.9.0; the
+  **access-control TUI** in 0.10.0 — see above.)
 
 ## Out of scope (and why)
 

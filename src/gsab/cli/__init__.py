@@ -73,6 +73,27 @@ def mcp_cmd(
     run_server(read_only=read_only, policy_path=policy)
 
 
+@app.command("tui")
+def tui_cmd(
+    policy: Optional[str] = typer.Option(
+        None,
+        "--policy",
+        help="Path to an AccessPolicy JSON profile to open (and save back to).",
+    ),
+) -> None:
+    """Launch the access-control TUI — edit an AccessPolicy, probe it, watch live activity."""
+    try:
+        from ..tui.app import run as run_tui
+    except ImportError:
+        typer.secho(
+            "The TUI needs the 'tui' extra: pip install \"gsab[tui]\"",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1) from None
+    run_tui(policy_path=policy)
+
+
 @app.command("help")
 def help_cmd(
     ctx: typer.Context,

@@ -3,6 +3,30 @@
 All notable changes to GSAB are documented here. This project follows [Semantic Versioning](https://semver.org).
 Tagged releases (`vX.Y.Z`) publish to PyPI automatically.
 
+## [0.10.0] — 2026-07-02
+
+Access control gets a face — a terminal UI over `AccessPolicy`.
+
+### Added
+- **Access-control TUI** *(Experimental)* — `gsab tui` (install with `pip install "gsab[tui]"`)
+  opens a terminal cockpit over `AccessPolicy`: toggle `read_only` / `allow_share` /
+  `confirm_destructive`, pick the default + max share role, manage the allowed-sheets
+  allowlist, and **save/load the same JSON profile `gsab mcp --policy` reads**. A **probe**
+  panel shows whether any op (read / query / insert / upsert / update / delete / share /
+  create_sheet) would be allowed or blocked — running the exact guardrail checks the library
+  and MCP server apply — and a **live activity feed** streams the `on_activity` events an op
+  emits. The policy on screen is a real `AccessPolicy`, so a `SheetManager(..., policy=...)`
+  sharing it streams into the feed too.
+
+### Fixed
+- **`AccessPolicy.save()` no longer deep-copies the `on_activity` hook.** It built the profile
+  dict via `dataclasses.asdict()`, which deep-copies every field *before* dropping the hook — so
+  a bound-method hook (like the TUI's feed) could blow up on save. It now serializes the
+  JSON-native fields directly.
+- **`AccessPolicy` now canonicalizes share-role aliases at construction** (`editor` → `writer`,
+  `viewer` → `reader`, …) instead of storing them verbatim. A saved profile and every consumer
+  (the MCP server, the TUI's role selectors) now only ever see `reader`/`commenter`/`writer`.
+
 ## [0.9.0] — 2026-06-28
 
 Access control + a security pass — decide exactly what the library (and an AI agent) may do.
