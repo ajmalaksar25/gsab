@@ -67,8 +67,10 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
 
 - **Parallel writes don't get lost**: N concurrent inserts from N separate connections all
   land (Google inserts appends atomically).
-- **Updates are last-write-wins**: concurrent updates to the same row leave one value and an
-  intact row — there are **no transactions and no locking** (Sheets has none).
+- **Updates are cell-targeted, then last-write-wins**: `update()`/`upsert()` write only the
+  fields you changed (one cell each), so two clients editing **different fields of the same row**
+  both land. Only a true **same-cell** edit is last-write-wins — there are **no transactions and
+  no locking** (Sheets has none).
 - **Keys are enforced best-effort**: `primary_key`/`unique` are checked with a read before
   the write, so duplicates from a single client are rejected — but two clients inserting the
   same new key concurrently can both succeed (no conditional write). `upsert()` closes the

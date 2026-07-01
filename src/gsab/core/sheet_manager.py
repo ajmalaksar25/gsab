@@ -491,35 +491,37 @@ class SheetManager:
                 return sheet["properties"]["sheetId"]
         raise NotFoundError(f"Tab '{self.schema.name}' not found in spreadsheet {self.sheet_id}.")
 
-    def _update_cells_request(
-        self, sheet_id: int, row_index: int, record: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Build a single ``updateCells`` request writing ``record`` to one sheet row.
+    def _update_field_cells(
+        self, sheet_id: int, row_index: int, changes: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Build one ``updateCells`` request per *changed* field of a row.
 
-        ``record`` is the full row (all field names → values); callers merge their
-        changes over the existing values first. ``row_index`` is 0-based (header = 0).
+        Targeted per-cell writes — not the whole row — so two clients editing different
+        fields of the same row don't clobber each other (only a true same-cell edit is
+        last-write-wins; Sheets has no conditional write). Only fields present in
+        ``changes`` are written; ``row_index`` is 0-based (header = 0).
         """
-        values = [self._user_entered(field, record.get(field.name)) for field in self.schema.fields]
-        return {
-            "updateCells": {
-                "range": {
-                    "sheetId": sheet_id,
-                    "startRowIndex": row_index,
-                    "endRowIndex": row_index + 1,
-                    "startColumnIndex": 0,
-                    "endColumnIndex": len(self.schema.fields),
-                },
-                "rows": [{"values": [{"userEnteredValue": v} for v in values]}],
-                "fields": "userEnteredValue",
-            }
-        }
-
-    @staticmethod
-    def _merge(record: Dict[str, Any], changes: Dict[str, Any]) -> Dict[str, Any]:
-        """Overlay ``changes`` on an existing record, dropping the internal row index."""
-        merged = {k: v for k, v in record.items() if k != "_row_index"}
-        merged.update(changes)
-        return merged
+        requests: List[Dict[str, Any]] = []
+        for col_index, field in enumerate(self.schema.fields):
+            if field.name not in changes:
+                continue
+            value = self._user_entered(field, changes[field.name])
+            requests.append(
+                {
+                    "updateCells": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": row_index,
+                            "endRowIndex": row_index + 1,
+                            "startColumnIndex": col_index,
+                            "endColumnIndex": col_index + 1,
+                        },
+                        "rows": [{"values": [{"userEnteredValue": value}]}],
+                        "fields": "userEnteredValue",
+                    }
+                }
+            )
+        return requests
 
     async def update(self, filters: Dict[str, Any], updates: Dict[str, Any]) -> int:
         """Update records matching the filters. Returns the number of rows updated."""
@@ -531,16 +533,18 @@ class SheetManager:
             return 0
 
         sheet_id = await self._tab_id()
-        requests = [
-            self._update_cells_request(sheet_id, record["_row_index"], self._merge(record, updates))
-            for record in matching_records
-        ]
-        await execute(
-            self.connection.service.spreadsheets().batchUpdate(
-                spreadsheetId=self.sheet_id, body={"requests": requests}
-            ),
-            op="update",
-        )
+        # Write only the changed cells (not the whole row), so concurrent edits to different
+        # fields of the same row don't clobber each other.
+        requests: List[Dict[str, Any]] = []
+        for record in matching_records:
+            requests.extend(self._update_field_cells(sheet_id, record["_row_index"], updates))
+        if requests:
+            await execute(
+                self.connection.service.spreadsheets().batchUpdate(
+                    spreadsheetId=self.sheet_id, body={"requests": requests}
+                ),
+                op="update",
+            )
         self.policy.emit(
             {"op": "update", "sheet_id": self.sheet_id, "count": len(matching_records)}
         )
@@ -564,9 +568,10 @@ class SheetManager:
             ValidationError: no key is available, or ``data`` omits the key value.
 
         Note:
-            This is a read-check-write — Google Sheets has no conditional write — so
-            two concurrent upserts of the same new key can both insert (duplicate), and
-            concurrent updates are last-write-wins.
+            This is a read-check-write — Google Sheets has no conditional write — so two
+            concurrent upserts of the same new key can both insert (duplicate). Updates write
+            only the fields you supply (one cell each), so concurrent edits to different fields
+            of the same row are safe; only a same-cell edit is last-write-wins.
         """
         result = await self.bulk_upsert([data], key=key)
         return "updated" if result["updated"] else "inserted"
@@ -614,6 +619,7 @@ class SheetManager:
 
         to_append: List[List[Any]] = []
         update_requests: List[Dict[str, Any]] = []
+        updated_rows = 0
         sheet_id: Optional[int] = None
         for key_value, record in deduped.items():
             matches = by_key.get(key_value)
@@ -621,10 +627,12 @@ class SheetManager:
                 if sheet_id is None:
                     sheet_id = await self._tab_id()
                 for existing_row in matches:
-                    merged = self._merge(existing_row, record)
-                    update_requests.append(
-                        self._update_cells_request(sheet_id, existing_row["_row_index"], merged)
+                    # Only the supplied fields are written (targeted cells); omitted fields
+                    # keep their current value and aren't touched.
+                    update_requests.extend(
+                        self._update_field_cells(sheet_id, existing_row["_row_index"], record)
                     )
+                    updated_rows += 1
             else:
                 to_append.append(self._encode_row(record))
 
@@ -637,16 +645,16 @@ class SheetManager:
                 ),
                 op="upsert",
             )
-        logger.info("Upserted: %d inserted, %d updated", len(to_append), len(update_requests))
+        logger.info("Upserted: %d inserted, %d updated", len(to_append), updated_rows)
         self.policy.emit(
             {
                 "op": "upsert",
                 "sheet_id": self.sheet_id,
                 "inserted": len(to_append),
-                "updated": len(update_requests),
+                "updated": updated_rows,
             }
         )
-        return {"inserted": len(to_append), "updated": len(update_requests)}
+        return {"inserted": len(to_append), "updated": updated_rows}
 
     async def delete(self, filters: Dict[str, Any], *, confirm: bool = False) -> int:
         """Delete rows matching the filters. Returns the number of rows deleted.

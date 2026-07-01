@@ -31,7 +31,7 @@ Async unless noted. Import from `gsab`.
   - Filters: `{field: value}` (equality) or `{field: {op: value}}`.
   - Operators: `$eq $ne $gt $gte $lt $lte $in $nin $contains $regex`.
 - `watch(*, interval=2.0, filters=None, key=None, emit_initial=True)` — **async generator (Experimental)**. Polls + diffs, yields `{"added", "updated", "removed"}` change sets (keyed on the primary key); sees writes from any connection or the Google UI. Polling (~interval s), not push. Run ONE watcher per sheet and fan out to N viewers (SSE/WebSocket) — see `gsab cookbook show realtime_api`. `async for change in db.watch(): ...`
-- `await update(filters: dict, updates: dict) -> int` — rows changed.
+- `await update(filters: dict, updates: dict) -> int` — rows changed. Writes only the changed cells, so concurrent edits to *different* fields of the same row don't clobber each other.
 - `await delete(filters: dict, *, confirm=False) -> int` — rows deleted (handles duplicate rows correctly). If the policy sets `confirm_destructive`, pass `confirm=True`.
 - `await query(sql: str) -> list[dict]` — server-side Google Visualization query. Columns are letters; `column(name)` maps a field to its letter. Schema columns come back typed/decrypted; aggregates stay gviz-native.
 - `column(field_name: str) -> str` — e.g. `"A"`.

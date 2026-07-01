@@ -246,17 +246,39 @@ async def test_upsert_inserts_when_key_absent():
     assert conn.batched == []  # no update path
 
 
-async def test_upsert_updates_existing_row_and_merges():
+async def test_update_writes_only_changed_cells():
+    # Targeted per-cell write: only the 'age' column of the matched row is touched, so a
+    # concurrent edit to a different field of the same row wouldn't be clobbered.
+    conn = FakeConnection([["id", "age"], ["1", "20"], ["2", "30"]])
+    db = SheetManager(conn, _pk_schema())
+    db.sheet_id = "SHEET"
+    n = await db.update({"id": 1}, {"age": 21})
+    assert n == 1
+    reqs = conn.batched[0]["requests"]
+    assert len(reqs) == 1  # one cell, not the whole 2-column row
+    rng = reqs[0]["updateCells"]["range"]
+    assert (rng["startRowIndex"], rng["endRowIndex"]) == (1, 2)  # id=1 is the first data row
+    assert (rng["startColumnIndex"], rng["endColumnIndex"]) == (1, 2)  # 'age' is column index 1
+    assert reqs[0]["updateCells"]["rows"][0]["values"][0]["userEnteredValue"] == {"numberValue": 21}
+
+
+async def test_upsert_updates_existing_row_targeted_cells():
     conn = FakeConnection([["id", "age"], ["1", "20"], ["2", "30"]])
     db = SheetManager(conn, _pk_schema())
     db.sheet_id = "SHEET"
     status = await db.upsert({"id": 2, "age": 99})
     assert status == "updated"
     assert conn.appended == []  # nothing inserted
-    req = conn.batched[0]["requests"][0]["updateCells"]
-    assert (req["range"]["startRowIndex"], req["range"]["endRowIndex"]) == (2, 3)  # id=2 row
-    written = [c["userEnteredValue"] for c in req["rows"][0]["values"]]
-    assert written == [{"numberValue": 2}, {"numberValue": 99}]
+    # Targeted per-cell: one single-cell updateCells per supplied field, all on the id=2 row.
+    written = {}
+    for r in conn.batched[0]["requests"]:
+        rng = r["updateCells"]["range"]
+        assert (rng["startRowIndex"], rng["endRowIndex"]) == (2, 3)  # id=2 row
+        assert rng["endColumnIndex"] - rng["startColumnIndex"] == 1  # a single cell
+        written[rng["startColumnIndex"]] = r["updateCells"]["rows"][0]["values"][0][
+            "userEnteredValue"
+        ]
+    assert written == {0: {"numberValue": 2}, 1: {"numberValue": 99}}
 
 
 async def test_bulk_upsert_counts_and_last_write_wins():

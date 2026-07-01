@@ -18,6 +18,12 @@ Access control gets a face — a terminal UI over `AccessPolicy`.
   emits. The policy on screen is a real `AccessPolicy`, so a `SheetManager(..., policy=...)`
   sharing it streams into the feed too.
 
+### Changed
+- **`update()` / `upsert()` now write only the changed cells, not the whole row.** Each
+  supplied field becomes a targeted single-cell write, so two clients editing *different fields
+  of the same row* at the same time no longer clobber each other — only a true same-*cell* edit
+  is last-write-wins (Google Sheets has no conditional write). Omitted fields are left untouched.
+
 ### Fixed
 - **`AccessPolicy.save()` no longer deep-copies the `on_activity` hook.** It built the profile
   dict via `dataclasses.asdict()`, which deep-copies every field *before* dropping the hook — so
