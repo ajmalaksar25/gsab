@@ -69,7 +69,7 @@ asyncio.run(main())
 ## Going further
 
 - Full API surface + the error/exception hierarchy: see [reference.md](reference.md).
-- Lock down what the library (or an AI agent) may do with `AccessPolicy` — `read_only`, an allowed-sheets allowlist, a share-role cap, destructive-confirm, an activity feed. Pass it to `SheetManager(..., policy=...)` or run `gsab mcp --read-only` / `--policy profile.json`. See [reference.md](reference.md).
+- Lock down what the library (or an AI agent) may do with `AccessPolicy` — `read_only`, an allowed-sheets allowlist, a share-role cap, destructive-confirm, an activity feed. Pass it to `SheetManager(..., policy=...)`, run `gsab mcp --read-only` / `--policy profile.json`, or edit + probe it live with `gsab tui` (Experimental; `pip install "gsab[tui]"`). See [reference.md](reference.md).
 - Cookbook (import a CSV, server-side queries, encryption, pandas analytics): see [recipes.md](recipes.md).
 - Build a REST API on GSAB: use the `gsab-fastapi` skill.
 - Canonical docs: https://gsab.ajmalaksar.com/docs (and /llms-full.txt to paste into any LLM).

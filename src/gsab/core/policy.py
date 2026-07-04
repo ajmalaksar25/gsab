@@ -10,7 +10,7 @@ can bypass it; Google still enforces the real permissions.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, fields
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -66,9 +66,11 @@ class AccessPolicy:
     on_activity: Optional[Callable[[Dict[str, Any]], None]] = None
 
     def __post_init__(self) -> None:
-        # Validate the role fields up front so a bad profile fails loudly at construction.
-        _norm_role(self.default_share_role)
-        _norm_role(self.max_share_role)
+        # Normalize + validate the role fields up front (aliases like 'editor' -> 'writer'),
+        # so every consumer — save/load, the MCP server, the TUI's role selectors — only ever
+        # sees the canonical reader/commenter/writer. A bad role fails loudly here.
+        self.default_share_role = _norm_role(self.default_share_role)
+        self.max_share_role = _norm_role(self.max_share_role)
 
     # --- checks (raise PolicyError when an action is blocked) ----------------
 
@@ -117,7 +119,10 @@ class AccessPolicy:
 
     def save(self, path: str) -> None:
         """Write the policy to a JSON profile (the ``on_activity`` hook is not stored)."""
-        data = {k: v for k, v in asdict(self).items() if k != "on_activity"}
+        # Build the dict field-by-field rather than via dataclasses.asdict(): asdict deep-
+        # copies every field first, and on_activity can be a bound method of a UI object
+        # (e.g. the TUI) that isn't deep-copyable. The stored fields are all JSON-native.
+        data = {f.name: getattr(self, f.name) for f in fields(self) if f.name != "on_activity"}
         Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     @classmethod

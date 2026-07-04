@@ -37,7 +37,8 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 - **pandas bridge** — `to_dataframe()` / `from_dataframe()` and `bulk_insert()` for the whole analytics ecosystem.
 - **Native charts** — `chart()` embeds a Google chart in the sheet; or hand `to_dataframe()` to matplotlib/Plotly.
 - **One-call public sharing** — `share(role=...)` publishes a created sheet to a public link (`reader`/`commenter`/`writer`, default reader; `csv_url` for embedding); `unshare()` revokes. No extra scope — GSAB owns the sheets it makes.
-- **Access control (`AccessPolicy`)** — pass guardrails to `SheetManager` or the MCP server (and share them as a JSON profile): read-only mode, an allowed-sheets allowlist, a share-role cap, destructive-op confirmation, and an activity hook. A client-side guardrail for control + visibility — the OAuth scope stays the real boundary.
+- **Access control (`AccessPolicy`)** — pass guardrails to `SheetManager`, the MCP server or the TUI (and share them as a JSON profile): read-only mode, an allowed-sheets allowlist, a share-role cap, destructive-op confirmation, and an activity hook. A client-side guardrail for control + visibility — the OAuth scope stays the real boundary.
+- **Access-control TUI** *(Experimental)* — `gsab tui` is a terminal cockpit over `AccessPolicy`: edit the guardrails, manage the allowlist, **probe** whether an op would be allowed or blocked (the real check the library and MCP run), and watch a **live activity feed**. Saves/loads the same profile `gsab mcp --policy` reads. `pip install "gsab[tui]"`.
 - **Actionable errors** — Google API errors become clear GSAB exceptions with retry/backoff and token refresh — readable by humans and LLM agents.
 - **Installable agent skills** — `gsab skill install` drops GSAB skills into `.claude/skills` (or `--portable` for any LLM) so your coding agent knows the real API.
 - **MCP server** — `gsab mcp` lets any MCP client (Claude, Codex, Cursor, Zed, …) use your Google Sheet as a database directly: create, insert, read, query, upsert, share. `--read-only` and `--policy` apply access controls. `pip install "gsab[mcp]"`.
@@ -45,9 +46,9 @@ Then define a schema and read/write your sheet. **Full usage, examples and the A
 
 ## Roadmap
 
-**Shipped (v0.9.0):** auth + CLI · schemas, validation & encryption · async CRUD · upsert + enforced primary keys · type-correct server-side query · **reactive `watch()` (Experimental)** · public sharing (reader/commenter/writer) · **MCP server** (`gsab mcp`, with `--read-only` / `--policy`) · **access control (`AccessPolicy`)** · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import · keychain storage · security CI (bandit + pip-audit).
+**Shipped (v0.10.0):** auth + CLI · schemas, validation & encryption · async CRUD · upsert + enforced primary keys · type-correct server-side query · **reactive `watch()` (Experimental)** · public sharing (reader/commenter/writer) · **MCP server** (`gsab mcp`, with `--read-only` / `--policy`) · **access control (`AccessPolicy`)** · **access-control TUI** (`gsab tui`, Experimental) · pandas bridge + bulk insert · native in-sheet charts · LLM-friendly errors + retry/backoff · installable agent skills · scaffolding & CSV import · keychain storage · security CI (bandit + pip-audit).
 
-**Coming next:** rate-aware batching · improved/pipe-friendly CLI · a JavaScript client · terminal UI · one-click hosted sign-in.
+**Coming next:** rate-aware batching · improved/pipe-friendly CLI · a JavaScript client · one-click hosted sign-in.
 
 Full roadmap with per-feature stability (and what's deliberately out of scope) → [ROADMAP.md](ROADMAP.md). Live summary → [gsab.ajmalaksar.com/#roadmap](https://gsab.ajmalaksar.com/#roadmap).
 

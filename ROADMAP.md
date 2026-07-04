@@ -67,8 +67,10 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
 
 - **Parallel writes don't get lost**: N concurrent inserts from N separate connections all
   land (Google inserts appends atomically).
-- **Updates are last-write-wins**: concurrent updates to the same row leave one value and an
-  intact row — there are **no transactions and no locking** (Sheets has none).
+- **Updates are cell-targeted, then last-write-wins**: `update()`/`upsert()` write only the
+  fields you changed (one cell each), so two clients editing **different fields of the same row**
+  both land. Only a true **same-cell** edit is last-write-wins — there are **no transactions and
+  no locking** (Sheets has none).
 - **Keys are enforced best-effort**: `primary_key`/`unique` are checked with a read before
   the write, so duplicates from a single client are rejected — but two clients inserting the
   same new key concurrently can both succeed (no conditional write). `upsert()` closes the
@@ -86,6 +88,12 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
 
 ## Experimental (shipped early, flagged in docs)
 
+- **Access-control TUI** *(Experimental, 0.10.0)* — `gsab tui` (extra: `pip install "gsab[tui]"`)
+  is a terminal cockpit over `AccessPolicy`: edit the guardrails, manage the allowed-sheets
+  allowlist, **probe** whether an op would be allowed or blocked (the real check the library and
+  MCP server run), and watch a **live `on_activity` feed**. It save/loads the same JSON profile
+  `gsab mcp --policy` reads — one profile, three surfaces (library, MCP, TUI). Built on Textual;
+  the UI may still change.
 - **Reactive `watch()`** *(Experimental, 0.7.0)* — Google Sheets has **no change-stream/push**
   for cell edits (verified: Sheets API has none; Drive `changes.watch` is file-level and
   batched ~every 3 min). So GSAB does the only portable thing: `watch()` **polls + diffs +
@@ -113,9 +121,9 @@ piece is. The public summary lives at https://gsab.ajmalaksar.com/#roadmap.
   auth across reusable clients, plus a batching layer; not persistent DB connections.
   *(Researching)*
 - **A JavaScript client** (Convex-style parity for lightweight JS apps) — *in progress*: the
-  no-auth public read/query/watch tier already works in the browser. A **TUI** (terminal UI over
-  `AccessPolicy` — manage access + watch live activity) and a **hosted easy-mode auth broker** are
-  *Planned*. (The **MCP server** shipped in 0.8.0; **AccessPolicy** in 0.9.0 — see above.)
+  no-auth public read/query/watch tier already works in the browser. A **hosted easy-mode auth
+  broker** is *Planned*. (The **MCP server** shipped in 0.8.0; **AccessPolicy** in 0.9.0; the
+  **access-control TUI** in 0.10.0 — see above.)
 
 ## Out of scope (and why)
 
